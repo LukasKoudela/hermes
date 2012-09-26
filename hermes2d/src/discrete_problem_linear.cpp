@@ -123,7 +123,7 @@ namespace Hermes
       Hermes::vector<VectorFormDG<Scalar>*>* vfDG = new Hermes::vector<VectorFormDG<Scalar>*>[Hermes2DApi.get_param_value(Hermes::Hermes2D::numThreads)];
 
       // Fill these structures.
-      this->init_assembling(NULL, pss, spss, refmaps, u_ext, als, ext_functions, ext, mfvol, mfsurf, mfDG, vfvol, vfsurf, vfDG);
+      this->init_assembling(NULL, u_ext, als, ext_functions, ext, mfvol, mfsurf, mfDG, vfvol, vfsurf, vfDG);
 
       // Vector of meshes.
       Hermes::vector<const Mesh*> meshes;
@@ -207,7 +207,7 @@ namespace Hermes
             // The proper sub-element mappings to all the functions of
             // this stage is supplied by the function Traverse::get_next_state()
             // called in the while loop.
-            this->assemble_one_state(current_pss, current_spss, current_refmaps, current_u_ext, current_als, &current_state, current_mfvol, current_mfsurf, current_vfvol, current_vfsurf);
+            this->assemble_one_state(current_u_ext, current_als, &current_state, current_mfvol, current_mfsurf, current_vfvol, current_vfsurf);
 
             if(this->DG_matrix_forms_present || this->DG_vector_forms_present)
               this->assemble_one_DG_state(current_pss, current_spss, current_refmaps, NULL, current_als, &current_state, current_mfDG, current_vfDG, trav[omp_get_thread_num()].fn);
@@ -225,7 +225,7 @@ namespace Hermes
         }
       }
 
-      deinit_assembling(pss, spss, refmaps, u_ext, als, ext_functions, ext, mfvol, mfsurf, mfDG, vfvol, vfsurf, vfDG);
+      deinit_assembling(u_ext, als, ext_functions, ext, mfvol, mfsurf, mfDG, vfvol, vfsurf, vfDG);
 
       trav_master.finish();
       for(unsigned int i = 0; i < Hermes2DApi.get_param_value(Hermes::Hermes2D::numThreads); i++)

@@ -96,6 +96,7 @@ namespace Hermes
         Rect* er;
         int num;
         int isurf;
+        bool isBnd;
       friend class Traverse;
       friend class Views::Linearizer;
       friend class Views::Vectorizer;

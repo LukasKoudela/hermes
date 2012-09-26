@@ -21,7 +21,7 @@ namespace Hermes
   {
     template<typename Scalar>
     MeshFunction<Scalar>::MeshFunction()
-      : Function<Scalar>()
+      : Function<Scalar>(), assemblyTraverseOrder(0)
     {
       refmap = new RefMap;
       mesh = NULL;
@@ -30,7 +30,7 @@ namespace Hermes
 
     template<typename Scalar>
     MeshFunction<Scalar>::MeshFunction(const Mesh *mesh) :
-    Function<Scalar>()
+    Function<Scalar>(), assemblyTraverseOrder(0)
     {
       this->mesh = mesh;
       this->refmap = new RefMap;

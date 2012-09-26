@@ -127,6 +127,7 @@ namespace Hermes
       for (int i = 0; i < num; i++)
         er[i] = H2D_UNITY;
       isurf = -1;
+      isBnd = false;
     }
 
     void Traverse::State::operator=(const State * other)
@@ -229,7 +230,10 @@ namespace Hermes
       if(s->rep->is_triangle())
       {
         for (int i = 0; i < 3; i++)
-          (s->bnd[i] = (s->bnd[i] && e->en[i]->bnd));
+          if(s->bnd[i] = (s->bnd[i] && e->en[i]->bnd))
+            s->isBnd = true;
+          else
+            s->isBnd = false;
       }
       else
       {
@@ -237,6 +241,10 @@ namespace Hermes
         s->bnd[1] = s->bnd[1] && (s->cr.r == ONE) && e->en[1]->bnd;
         s->bnd[2] = s->bnd[2] && (s->cr.t == ONE) && e->en[2]->bnd;
         s->bnd[3] = s->bnd[3] && (s->cr.l == 0)   && e->en[3]->bnd;
+        if(s->bnd[0] || s->bnd[1] || s->bnd[2] || s->bnd[3])
+          s->isBnd = true;
+        else
+          s->isBnd = false;
       }
     }
 

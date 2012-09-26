@@ -27,8 +27,8 @@
 
 const bool HERMES_VISUALIZATION = true;           // Set to "false" to suppress Hermes OpenGL visualization.
 const bool VTK_VISUALIZATION = false;              // Set to "true" to enable VTK output.
-const int P_INIT = 1;                             // Uniform polynomial degree of mesh elements.
-const int INIT_REF_NUM = 1;                       // Number of initial uniform mesh refinements.
+const int P_INIT = 2;                             // Uniform polynomial degree of mesh elements.
+const int INIT_REF_NUM = 2;                       // Number of initial uniform mesh refinements.
 
 // Problem parameters.
 const double LAMBDA_AL = 236.0;            // Thermal cond. of Al for temperatures around 20 deg Celsius.
@@ -40,7 +40,7 @@ int main(int argc, char* argv[])
 {
   // Set the number of threads used in Hermes.
   Hermes::HermesCommonApi.set_param_value(Hermes::exceptionsPrintCallstack, 0);
-  Hermes::Hermes2D::Hermes2DApi.set_param_value(Hermes::Hermes2D::numThreads, 8);
+  Hermes::Hermes2D::Hermes2DApi.set_param_value(Hermes::Hermes2D::numThreads, 1);
 
   // Load the mesh.
   Hermes::Hermes2D::Mesh mesh;
@@ -63,12 +63,10 @@ int main(int argc, char* argv[])
   // Create an H1 space with default shapeset.
   Hermes::Hermes2D::H1Space<double> space(&mesh, &bcs, P_INIT);
 
+  Hermes::Hermes2D::Views::BaseView<double> b;
+  //b.show(&space);
+
   Hermes::Hermes2D::Element* e;
-  int i = 1;
-  for_all_active_elements(e, &mesh)
-  {
-    space.set_element_order(e->id, i++ % 9 + 1);
-  }
 
   // Initialize the solution.
   Hermes::Hermes2D::Solution<double> sln;
@@ -106,7 +104,8 @@ int main(int argc, char* argv[])
 
     if(HERMES_VISUALIZATION)
     {
-      viewS.show(&sln, Hermes::Hermes2D::Views::HERMES_EPS_LOW * 100.);
+      viewS.show(&sln);
+      viewS.wait();
     }
   }
   catch(std::exception& e)

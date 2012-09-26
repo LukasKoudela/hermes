@@ -49,6 +49,8 @@ namespace Hermes
       virtual void reinit();
 
     protected:
+      virtual Func<double>* calculate(double* x_phys, double* y_phys, double* x_ref, double* y_ref, int np, double2x2* inv_ref_map) const;
+
       void init(const Hermes::vector<MeshFunction<Scalar>*>& solutions);
 
       virtual void set_quad_2d(Quad2D* quad_2d);

@@ -45,6 +45,7 @@ namespace Hermes
     {
     public:
       RefMap();
+      RefMap(Element* element, uint64_t sub_idx);
 
       ~RefMap();
 

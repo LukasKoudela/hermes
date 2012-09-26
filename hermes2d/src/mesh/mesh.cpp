@@ -919,7 +919,7 @@ namespace Hermes
     void Mesh::refine_towards_boundary(Hermes::vector<std::string> markers, int depth, bool aniso, bool mark_as_initial)
     {
       rtb_aniso = aniso;
-      bool refined = false;
+      bool refined = depth > 0 ? false : true;
 
       // refinement: refine all elements to quad elements.
       for (int i = 0; i < depth; i++)
@@ -961,7 +961,7 @@ namespace Hermes
 
       else
       {
-        bool refined = false;
+        bool refined = depth > 0 ? false : true;
         rtb_marker = this->boundary_markers_conversion.get_internal_marker(marker).marker;
         rtb_aniso = aniso;
 
@@ -1003,7 +1003,7 @@ namespace Hermes
       
     void Mesh::refine_in_areas(Hermes::vector<std::string> markers, int depth, bool mark_as_initial)
     {
-      bool refined = false;
+      bool refined = depth > 0 ? false : true;
       for (int i = 0; i < depth; i++)
       {
         Element* e;

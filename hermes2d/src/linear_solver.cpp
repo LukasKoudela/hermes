@@ -34,13 +34,13 @@ namespace Hermes
     }
 
     template<typename Scalar>
-    LinearSolver<Scalar>::LinearSolver(const WeakForm<Scalar>* wf, const Space<Scalar>* space) : dp(new DiscreteProblemLinear<Scalar>(wf, space)), sln_vector(NULL), own_dp(true)
+    LinearSolver<Scalar>::LinearSolver(const WeakForm<Scalar>* wf, const Space<Scalar>* space) : dp(new DiscreteProblem<Scalar>(wf, space)), sln_vector(NULL), own_dp(true)
     {
       this->init();
     }
 
     template<typename Scalar>
-    LinearSolver<Scalar>::LinearSolver(const WeakForm<Scalar>* wf, Hermes::vector<const Space<Scalar>*> spaces) : dp(new DiscreteProblemLinear<Scalar>(wf, spaces)), sln_vector(NULL), own_dp(true)
+    LinearSolver<Scalar>::LinearSolver(const WeakForm<Scalar>* wf, Hermes::vector<const Space<Scalar>*> spaces) : dp(new DiscreteProblem<Scalar>(wf, spaces)), sln_vector(NULL), own_dp(true)
     {
       this->init();
     }

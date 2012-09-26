@@ -30,6 +30,16 @@ namespace Hermes
       set_quad_2d(&g_quad_2d_std); // default quadrature
     }
 
+    RefMap::RefMap(Element* element, uint64_t sub_idx) : ref_map_shapeset(H1ShapesetJacobi()), ref_map_pss(PrecalcShapeset(&ref_map_shapeset))
+    {
+      num_tables = 0;
+      cur_node = NULL;
+      overflow = NULL;
+      set_quad_2d(&g_quad_2d_std); // default quadrature
+      this->set_active_element(element);
+      this->set_transform(sub_idx);
+    }
+
     RefMap::~RefMap() { free(); }
 
     /// Returns the current quadrature points.

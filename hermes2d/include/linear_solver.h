@@ -55,7 +55,7 @@ namespace Hermes
       virtual Hermes::vector<const Space<Scalar>*> get_spaces() const;
       
     protected:
-      DiscreteProblemLinear<Scalar>* dp; ///< FE problem being solved.
+      DiscreteProblem<Scalar>* dp; ///< FE problem being solved.
 
       /// The solution vector.
       Scalar* sln_vector;

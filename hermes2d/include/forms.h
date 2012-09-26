@@ -22,8 +22,8 @@
 #include "quadrature/quad.h"
 #include "function/function.h"
 #include "function/solution.h"
-#include "mesh/refmap.h"
 #include "mesh/traverse.h"
+#include "mesh/refmap.h"
 #include <complex>
 
 namespace Hermes
@@ -110,6 +110,7 @@ namespace Hermes
       template<typename Scalar> friend Func<Scalar>* init_fn(Solution<Scalar>*fu, const int order);
 
       template<typename Scalar> friend class DiscontinuousFunc;
+      friend class PrecalcShapeset;
       template<typename Scalar> friend class ExtData;
       template<typename Scalar> friend class Adapt;
       template<typename Scalar> friend class KellyTypeAdapt;

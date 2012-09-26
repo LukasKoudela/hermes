@@ -970,6 +970,151 @@ namespace Hermes
     }
 
     template<typename Scalar>
+    Func<Scalar>* Solution<Scalar>::calculate(double* x_phys, double* y_phys, double* x_ref, double* y_ref, int np, double2x2* inv_ref_map) const
+    {
+      Func<double>* u = new Func<double>(np, this->num_components);
+      SpaceType space_type = this->get_space_type();
+
+      double*** result = new double**[2];
+      result[0] = new double*[3];
+      result[0][0] = new double[np];
+      result[0][1] = new double[np];
+      result[0][2] = new double[np];
+
+      if(this->num_components > 1)
+      {
+        result[0] = new double*[3];
+        result[0][0] = new double[np];
+        result[0][1] = new double[np];
+        result[0][2] = new double[np];
+      }
+
+      if(sln_type == HERMES_SLN)
+      {
+        // obtain the solution values, this is the core of the whole module
+        Scalar* tx = new Scalar[np];
+
+        int o = elem_orders[this->element->id];
+        for (int l = 0; l < this->num_components; l++)
+        {
+          for (int k = 0; k < 3; k++)
+          {
+            // calculate the solution values using Horner's scheme.
+            Scalar* mono = dxdy_coeffs[l][k];
+            for (int i = 0; i <= o; i++)
+            {
+              set_vec_num(np, tx, *mono++);
+              for (int j = 1; j <= (this->mode ? o : i); j++)
+                vec_x_vec_p_num(np, tx, x_ref, *mono++);
+
+              if(!i)
+                memcpy(result[l][k], tx, sizeof(Scalar)*np);
+              else
+                vec_x_vec_p_vec(np, result[l][k], y_ref, tx);
+            }
+          }
+        }
+
+        if(space_type == HERMES_H1_SPACE || space_type == HERMES_L2_SPACE)
+        {
+          u->val = new double[np];
+          u->dx = new double[np];
+          u->dy = new double[np];
+          for (int i = 0; i < np; i++, inv_ref_map++)
+          {
+            u->val[i] = result[0][0][i];
+            u->dx[i] = (result[0][1][i] * (*inv_ref_map)[0][0] + result[0][2][i] * (*inv_ref_map)[0][1]);
+            u->dy[i] = (result[0][1][i] * (*inv_ref_map)[1][0] + result[0][2][i] * (*inv_ref_map)[1][1]);
+          }
+        }
+        else if(space_type == HERMES_HCURL_SPACE)
+        {
+          u->val0 = new double[np];
+          u->val1 = new double[np];
+          u->curl = new double[np];
+          for (int i = 0; i < np; i++, inv_ref_map++)
+          {
+            u->val0[i] = (result[0][0][i] * (*inv_ref_map)[0][0] + result[1][0][i] * (*inv_ref_map)[0][1]);
+            u->val1[i] = (result[0][0][i] * (*inv_ref_map)[1][0] + result[1][0][i] * (*inv_ref_map)[1][1]);
+            u->curl[i] = ((*inv_ref_map)[0][0] * (*inv_ref_map)[1][1] - (*inv_ref_map)[1][0] * (*inv_ref_map)[0][1]) * (result[1][1][i] - result[0][2][i]);
+          }
+        }
+        // Hdiv space.
+        else if(space_type == HERMES_HDIV_SPACE)
+        {
+          u->val0 = new double[np];
+          u->val1 = new double[np];
+          u->div = new double[np];
+          for (int i = 0; i < np; i++, inv_ref_map++)
+          {
+            u->val0[i] = (  result[0][0][i] * (*inv_ref_map)[1][1] - result[1][0][i] * (*inv_ref_map)[1][0]);
+            u->val1[i] = (- result[0][0][i] * (*inv_ref_map)[0][1] + result[1][0][i] * (*inv_ref_map)[0][0]);
+            u->div[i] = ((*inv_ref_map)[0][0] * (*inv_ref_map)[1][1] - (*inv_ref_map)[1][0] * (*inv_ref_map)[0][1]) * (result[0][1][i] + result[1][2][i]);
+          }
+        }
+
+        inv_ref_map -= np;
+        delete [] tx;
+      }
+      else if(sln_type == HERMES_EXACT)
+      {
+        // evaluate the exact solution
+        if(this->num_components == 1)
+        {
+          u->val = new double[np];
+          u->dx = new double[np];
+          u->dy = new double[np];
+          for (int i = 0; i < np; i++)
+          {
+            Scalar val, dx = 0.0, dy = 0.0;
+            val = (static_cast<ExactSolutionScalar<Scalar>*>(this))->exact_function(x_phys[i], y_phys[i], dx, dy);
+
+            u->val[i] = val * (static_cast<ExactSolutionVector<Scalar>*>(this))->exact_multiplicator;
+            u->dx[i] = dx * (static_cast<ExactSolutionVector<Scalar>*>(this))->exact_multiplicator;
+            u->dy[i] = dy * (static_cast<ExactSolutionVector<Scalar>*>(this))->exact_multiplicator;
+          }
+        }
+        else
+        {
+          u->val0 = new double[np];
+          u->val1 = new double[np];
+          u->dx0 = new double[np];
+          u->dx1 = new double[np];
+          u->dy0 = new double[np];
+          u->dy1 = new double[np];
+          for (int i = 0; i < np; i++)
+          {
+            Scalar2<Scalar> dx (0.0, 0.0 ), dy ( 0.0, 0.0 );
+            Scalar2<Scalar> val = (static_cast<ExactSolutionVector<Scalar>*>(this))->exact_function(x_phys[i], y_phys[i], dx, dy);
+
+            u->val0[i] = val[0] * (static_cast<ExactSolutionVector<Scalar>*>(this))->exact_multiplicator;
+            u->dx0[i] = dx[0] * (static_cast<ExactSolutionVector<Scalar>*>(this))->exact_multiplicator;
+            u->dy0[i] = dy[0] * (static_cast<ExactSolutionVector<Scalar>*>(this))->exact_multiplicator;
+            u->val1[i] = val[1] * (static_cast<ExactSolutionVector<Scalar>*>(this))->exact_multiplicator;
+            u->dx1[i] = dx[1] * (static_cast<ExactSolutionVector<Scalar>*>(this))->exact_multiplicator;
+            u->dy1[i] = dy[1] * (static_cast<ExactSolutionVector<Scalar>*>(this))->exact_multiplicator;
+          }
+        }
+      }
+
+      delete [] result[0][0];
+      delete [] result[0][1];
+      delete [] result[0][2];
+      delete [] result[0];
+
+      if(this->num_components > 1)
+      {
+        delete [] result[0][0];
+        delete [] result[0][1];
+        delete [] result[0][2];
+        delete [] result[0];
+      }
+      delete [] result;
+
+      return u;
+    }
+
+    template<typename Scalar>
     void Solution<Scalar>::precalculate(int order, int mask)
     {
       int i, j, k, l;

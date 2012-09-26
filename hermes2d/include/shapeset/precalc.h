@@ -71,6 +71,7 @@ namespace Hermes
       /// set_quad_order() and after that calling get_values(), get_dx_values(), etc.
       /// \param index[in] Shape index.
       void set_active_shape(int index);
+      void set_shape_index(int index);
 
       /// Returns the index of the active shape (can be negative if the shape is constrained).
       int get_active_shape() const;
@@ -112,6 +113,7 @@ namespace Hermes
       bool is_slave() const;
 
       virtual void precalculate(int order, int mask);
+      Func<double>* calculate(double3* xy, int np, double2x2* inv_ref_map) const;
 
       void update_max_index();
 
