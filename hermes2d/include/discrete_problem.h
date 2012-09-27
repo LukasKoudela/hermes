@@ -175,23 +175,19 @@ namespace Hermes
       /// Adjusts order to refmaps.
       void adjust_order_to_refmaps(Form<Scalar> *form, int& order, Hermes::Ord* o, RefMap** current_refmaps);
 
-      /// Matrix volumetric forms - calculate the integration order.
+      /// Matrix forms - calculate the integration order.
       int calc_order_matrix_form(MatrixForm<Scalar>* mfv, RefMap** current_refmaps, Solution<Scalar>** current_u_ext, Traverse::State* current_state);
 
-      /// Matrix volumetric forms - assemble the form.
-      virtual void assemble_matrix_form(MatrixForm<Scalar>* form, int order, Func<double>** base_fns, Func<double>** test_fns, RefMap** current_refmaps, Solution<Scalar>** current_u_ext, AsmList<Scalar>** current_als, Traverse::State* current_state);
+      /// Matrix forms - assemble the form.
+      virtual void assemble_matrix_form(MatrixForm<Scalar>* form, Func<double>** base_fns, Func<double>** test_fns, Func<Scalar>** u_ext, ExtData<Scalar>* ext,
+      AsmList<Scalar>* current_als_i, AsmList<Scalar>* current_als_j, int n_quadrature_points, Geom<double>* geometry, double* jacobian_x_weights);
 
-      virtual void assemble_matrix_form(MatrixForm<Scalar>* form, int order, Func<double>** base_fns, Func<double>** test_fns, Solution<Scalar>** current_u_ext, 
-      AsmList<Scalar>* current_als_i, AsmList<Scalar>* current_als_j, Traverse::State* current_state, int n_quadrature_points, Geom<double>* geometry, double* jacobian_x_weights);
-
-      /// Vector volumetric forms - calculate the integration order.
+      /// Vector forms - calculate the integration order.
       int calc_order_vector_form(VectorForm<Scalar>* mfv, RefMap** current_refmaps, Solution<Scalar>** current_u_ext, Traverse::State* current_state);
 
-      /// Vector volumetric forms - assemble the form.
-      void assemble_vector_form(VectorForm<Scalar>* form, int order, Func<double>** test_fns, RefMap** current_refmaps, Solution<Scalar>** current_u_ext, AsmList<Scalar>** current_als, Traverse::State* current_state);
-
-      void assemble_vector_form(VectorForm<Scalar>* form, int order, Func<double>** test_fns, Solution<Scalar>** current_u_ext, 
-      AsmList<Scalar>* current_als, Traverse::State* current_state, int n_quadrature_points, Geom<double>* geometry, double* jacobian_x_weights);
+      /// Vector forms - assemble the form.
+      void assemble_vector_form(VectorForm<Scalar>* form, Func<double>** test_fns, Func<Scalar>** u_ext, ExtData<Scalar>* ext,
+      AsmList<Scalar>* current_als_i, int n_quadrature_points, Geom<double>* geometry, double* jacobian_x_weights);
 
       /// \ingroup Helper methods inside {calc_order_*, assemble_*}
       /// Init geometry, jacobian * weights, return the number of integration points.

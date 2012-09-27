@@ -112,6 +112,7 @@ namespace Hermes
       template<typename Scalar> friend class DiscontinuousFunc;
       friend class PrecalcShapeset;
       template<typename Scalar> friend class ExtData;
+      template<typename Scalar> friend class Solution;
       template<typename Scalar> friend class Adapt;
       template<typename Scalar> friend class KellyTypeAdapt;
       template<typename Scalar> friend class DiscreteProblem;

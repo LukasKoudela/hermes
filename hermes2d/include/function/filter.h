@@ -49,8 +49,6 @@ namespace Hermes
       virtual void reinit();
 
     protected:
-      virtual Func<double>* calculate(double* x_phys, double* y_phys, double* x_ref, double* y_ref, int np, double2x2* inv_ref_map) const;
-
       void init(const Hermes::vector<MeshFunction<Scalar>*>& solutions);
 
       virtual void set_quad_2d(Quad2D* quad_2d);
@@ -125,6 +123,8 @@ namespace Hermes
       virtual Scalar get_pt_value(double x, double y, int item = H2D_FN_VAL_0);
 
     protected:
+      virtual Func<Scalar>* calculate(double* x_phys, double* y_phys, double* x_ref, double* y_ref, int np, double2x2* inv_ref_map);
+
       int item[10];
 
       virtual void filter_fn(int n, Hermes::vector<Scalar*> values, Scalar* result) = 0;
@@ -143,6 +143,8 @@ namespace Hermes
       ComplexFilter(MeshFunction<std::complex<double> >* solution, int item = H2D_FN_VAL_0);
 
     protected:
+      virtual Func<double>* calculate(double* x_phys, double* y_phys, double* x_ref, double* y_ref, int np, double2x2* inv_ref_map);
+
       virtual double get_pt_value(double x, double y, int item = H2D_FN_VAL_0);
 
       virtual void set_quad_2d(Quad2D* quad_2d);
@@ -384,6 +386,8 @@ namespace Hermes
       virtual MeshFunction<double>* clone();
 
     protected:
+      virtual Func<double>* calculate(double* x_phys, double* y_phys, double* x_ref, double* y_ref, int np, double2x2* inv_ref_map);
+      
       double lambda, mu;
 
       int cyl, item1, item2;

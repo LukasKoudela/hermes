@@ -1511,7 +1511,7 @@ namespace Hermes
       double*** x_physSurf;
       double*** y_physSurf;
       int** npSurf;
-      double2x2*** inv_ref_map;
+      double2x2*** inv_ref_mapSurf;
       // The u_ext - previous Newton iterations - functions.
       Func<Scalar>*** u_ext_funcsSurf;
       if(current_state->isBnd)
@@ -1522,7 +1522,7 @@ namespace Hermes
         x_physSurf = new double**[4];
         y_physSurf = new double**[4];
         npSurf = new int*[4];
-        inv_ref_map = new double2x2**[4];
+        inv_ref_mapSurf = new double2x2**[4];
         u_ext_funcsSurf = new Func<Scalar>**[4];
 
         for(unsigned int i = 0; i < 4; i++)
@@ -1533,7 +1533,7 @@ namespace Hermes
           x_physSurf[i] = new double*[current_state->num];
           y_physSurf[i] = new double*[current_state->num];
           npSurf[i] = new int[current_state->num];
-          inv_ref_map = new double2x2*[current_state->num];
+          inv_ref_mapSurf[i] = new double2x2*[current_state->num];
           u_ext_funcsSurf[i] = new Func<Scalar>*[this->spaces.size()];
         }
       }
@@ -1557,7 +1557,35 @@ namespace Hermes
         x_phys[num_i] = refmaps[num_i]->get_phys_x(order);
         y_phys[num_i] = refmaps[num_i]->get_phys_y(order);
         inv_ref_map[num_i] = refmaps[num_i]->get_inv_ref_map(order);
+        
+        // Surface.
+        if(current_state->isBnd)
+        {
+          for (current_state->isurf = 0; current_state->isurf < current_state->rep->nvert; current_state->isurf++)
+          {
+            if(!current_state->bnd[current_state->isurf])
+              continue;
+            int surfOrder = order;
+
+            surfOrder = refmaps[num_i]->get_quad_2d()->get_edge_points(current_state->isurf, surfOrder, current_state->e[num_i]->get_mode());
+            xy_refSurf[current_state->isurf][num_i] = refmaps[num_i]->get_quad_2d()->get_points(surfOrder, current_state->e[num_i]->get_mode());
+              
+            npSurf[current_state->isurf][num_i] = refmaps[num_i]->get_quad_2d()->get_num_points(surfOrder, current_state->e[num_i]->get_mode());
+            x_refSurf[current_state->isurf][num_i] = new double[npSurf[current_state->isurf][num_i]];
+            y_refSurf[current_state->isurf][num_i] = new double[npSurf[current_state->isurf][num_i]];
+            for(unsigned int i = 0; i < npSurf[current_state->isurf][num_i]; i++)
+            {
+              x_refSurf[current_state->isurf][num_i][i] = xy_refSurf[current_state->isurf][num_i][i][0];
+              y_refSurf[current_state->isurf][num_i][i] = xy_refSurf[current_state->isurf][num_i][i][1];
+            }
+            x_physSurf[current_state->isurf][num_i] = refmaps[num_i]->get_phys_x(surfOrder);
+            y_physSurf[current_state->isurf][num_i] = refmaps[num_i]->get_phys_y(surfOrder);
+            inv_ref_mapSurf[current_state->isurf][num_i] = refmaps[num_i]->get_inv_ref_map(surfOrder);
+            surfOrder = order;
+          }
+        }
       }
+
 
       // Determining if the data for the element at hand are possible to take from the cache.
       bool changedInLastAdaptation = false;
@@ -1668,12 +1696,9 @@ namespace Hermes
           for (unsigned int j = 0; j < current_als[spaces_i]->cnt; j++)
           {
             precalc.set_shape_index(current_als[spaces_i]->idx[j]);
-            newRecord->fns[j] = precalc.calculate(xy_ref[spaces_i], np[spaces_i], inv_ref_map[spaces_i]) ;
+            newRecord->fns[j] = precalc.calculate(xy_ref[spaces_i], np[spaces_i], inv_ref_map[spaces_i]);
           }
-          // Calculate u_ext.
-          if(current_u_ext != NULL)
-            u_ext_funcs[spaces_i] = current_u_ext[spaces_i]->calculate(x_phys[spaces_i], y_phys[spaces_i], x_ref[spaces_i], y_ref[spaces_i], np[spaces_i], inv_ref_map[spaces_i]);
-
+          
           newRecord->n_quadrature_points = init_geometry_points(refmaps[spaces_i], newRecord->order, newRecord->geometry, newRecord->jacobian_x_weights);
         }
 
@@ -1681,29 +1706,6 @@ namespace Hermes
         // The loop must be broken, as the surface functions will need different points.
         if(current_state->isBnd)
         {
-          for (current_state->isurf = 0; current_state->isurf < newRecord->nvert; current_state->isurf++)
-          {
-            if(!current_state->bnd[current_state->isurf])
-              continue;
-            for(unsigned int num_i = 0; num_i < current_state->num; num_i++)
-            {
-              xy_refSurf[current_state->isurf][num_i] = refmaps[num_i]->get_quad_2d()->get_edge_points(current_state->isurf, order, current_state->e[num_i]->get_mode());
-
-              npSurf[current_state->isurf][num_i] = refmaps[num_i]->get_quad_2d()->get_num_points(order, current_state->e[num_i]->get_mode());
-              x_refSurf[current_state->isurf][num_i] = new double[npSurf[current_state->isurf][num_i]];
-              y_refSurf[current_state->isurf][num_i] = new double[npSurf[current_state->isurf][num_i]];
-              for(unsigned int i = 0; i < npSurf[current_state->isurf][num_i]; i++)
-              {
-                x_refSurf[current_state->isurf][num_i][i] = xy_refSurf[current_state->isurf][num_i][i][0];
-                y_refSurf[current_state->isurf][num_i][i] = xy_refSurf[current_state->isurf][num_i][i][1];
-              }
-              x_physSurf[current_state->isurf][num_i] = refmaps[num_i]->get_phys_x(order);
-              y_physSurf[current_state->isurf][num_i] = refmaps[num_i]->get_phys_y(order);
-              inv_ref_mapSurf[current_state->isurf][num_i] = refmaps[num_i]->get_inv_ref_map(order);
-              order = newRecord->order;
-            }
-          }
-
           for(unsigned int spaces_i = 0; spaces_i < this->spaces.size(); spaces_i++)
           {
             CacheRecordPerSubIdx* newRecord;
@@ -1741,11 +1743,27 @@ namespace Hermes
                 precalc.set_shape_index(current_alsSurface[spaces_i][current_state->isurf].idx[j]);
                 newRecord->fnsSurface[current_state->isurf][j] = precalc.calculate(xy_refSurf[current_state->isurf][spaces_i], npSurf[current_state->isurf][spaces_i], inv_ref_mapSurf[current_state->isurf][spaces_i]) ;
               }
-              // Calculate u_ext.
-              if(current_u_ext != NULL)
-                u_ext_funcsSurf[current_state->isurf][spaces_i] = current_u_ext[spaces_i]->calculate(x_physSurf[current_state->isurf][spaces_i], y_physSurf[current_state->isurf][spaces_i], x_ref[spaces_i], y_refSurf[current_state->isurf][spaces_i], npSurf[current_state->isurf][spaces_i], inv_ref_mapSurf[current_state->isurf][spaces_i]);
 
               order = newRecord->order;
+            }
+          }
+        }
+      }
+
+      // Calculate u_ext.
+      if(current_u_ext != NULL)
+      {
+        for(unsigned int spaces_i = 0; spaces_i < this->spaces.size(); spaces_i++)
+        {
+          current_u_ext[spaces_i]->set_active_element(current_state->e[spaces_i]);
+          u_ext_funcs[spaces_i] = current_u_ext[spaces_i]->calculate(x_phys[spaces_i], y_phys[spaces_i], x_ref[spaces_i], y_ref[spaces_i], np[spaces_i], inv_ref_map[spaces_i]);
+          if(current_state->isBnd)
+          {
+            for (current_state->isurf = 0; current_state->isurf < current_state->rep->nvert; current_state->isurf++)
+            {
+              if(!current_state->bnd[current_state->isurf])
+                continue;
+              u_ext_funcsSurf[current_state->isurf][spaces_i] = current_u_ext[spaces_i]->calculate(x_physSurf[current_state->isurf][spaces_i], y_physSurf[current_state->isurf][spaces_i], x_ref[spaces_i], y_refSurf[current_state->isurf][spaces_i], npSurf[current_state->isurf][spaces_i], inv_ref_mapSurf[current_state->isurf][spaces_i]);
             }
           }
         }
@@ -1755,45 +1773,68 @@ namespace Hermes
       {
         for(int current_mfvol_i = 0; current_mfvol_i < wf->mfvol.size(); current_mfvol_i++)
         {
-          if(!form_to_be_assembled(current_mfvol[current_mfvol_i], current_state))
+          MatrixFormVol<Scalar>* form = current_mfvol[current_mfvol_i];
+          if(!form_to_be_assembled(form, current_state))
             continue;
+
+          ExtData<Scalar> ext;
+          ext.nf = form->ext.size();
+          ext.fn = new Func<Scalar>*[ext.nf];
+          for (unsigned i = 0; i < ext.nf; i++)
+          {
+            if(form->ext[i] != NULL)
+              ext.fn[i] = form->ext[i]->calculate(x_phys[form->ext[i]->assemblyTraverseOrder], y_phys[form->ext[i]->assemblyTraverseOrder], x_ref[form->ext[i]->assemblyTraverseOrder], y_ref[form->ext[i]->assemblyTraverseOrder], np[form->ext[i]->assemblyTraverseOrder], inv_ref_map[form->ext[i]->assemblyTraverseOrder]);
+            else
+              ext.fn[i] = NULL;
+          }
+
           CacheRecordPerSubIdx* CacheRecordPerSubIdxI;
           CacheRecordPerSubIdx* CacheRecordPerSubIdxJ;
 #pragma omp critical (cache_for_subidx_preparation)
-          CacheRecordPerSubIdxI = this->cache_records_sub_idx[current_mfvol[current_mfvol_i]->i][current_state->e[current_mfvol[current_mfvol_i]->i]->id]->find(current_state->sub_idx[current_mfvol[current_mfvol_i]->i])->second;
+          CacheRecordPerSubIdxI = this->cache_records_sub_idx[form->i][current_state->e[form->i]->id]->find(current_state->sub_idx[form->i])->second;
 #pragma omp critical (cache_for_subidx_preparation)
-          CacheRecordPerSubIdxJ = this->cache_records_sub_idx[current_mfvol[current_mfvol_i]->j][current_state->e[current_mfvol[current_mfvol_i]->j]->id]->find(current_state->sub_idx[current_mfvol[current_mfvol_i]->j])->second;
+          CacheRecordPerSubIdxJ = this->cache_records_sub_idx[form->j][current_state->e[form->j]->id]->find(current_state->sub_idx[form->j])->second;
 
-          assemble_matrix_form(current_mfvol[current_mfvol_i], 
-            CacheRecordPerSubIdxI->order, 
+          assemble_matrix_form(form,
             CacheRecordPerSubIdxJ->fns, 
             CacheRecordPerSubIdxI->fns, 
-            current_u_ext, 
-            current_als[current_mfvol[current_mfvol_i]->i], 
-            current_als[current_mfvol[current_mfvol_i]->j], 
-            current_state, 
+            u_ext_funcs,
+            &ext,
+            current_als[form->i], 
+            current_als[form->j], 
             CacheRecordPerSubIdxI->n_quadrature_points, 
             CacheRecordPerSubIdxI->geometry, 
-             CacheRecordPerSubIdxI->jacobian_x_weights);
+            CacheRecordPerSubIdxI->jacobian_x_weights);
         }
       }
       if(current_rhs != NULL)
       {
         for(int current_vfvol_i = 0; current_vfvol_i < wf->vfvol.size(); current_vfvol_i++)
         {
-          if(!form_to_be_assembled(current_vfvol[current_vfvol_i], current_state))
+          VectorFormVol<Scalar>* form = current_vfvol[current_vfvol_i];
+          if(!form_to_be_assembled(form, current_state))
             continue;
+
+          ExtData<Scalar> ext;
+          ext.nf = form->ext.size();
+          ext.fn = new Func<Scalar>*[ext.nf];
+          for (unsigned i = 0; i < ext.nf; i++)
+          {
+            if(form->ext[i] != NULL)
+              ext.fn[i] = form->ext[i]->calculate(x_phys[form->ext[i]->assemblyTraverseOrder], y_phys[form->ext[i]->assemblyTraverseOrder], x_ref[form->ext[i]->assemblyTraverseOrder], y_ref[form->ext[i]->assemblyTraverseOrder], np[form->ext[i]->assemblyTraverseOrder], inv_ref_map[form->ext[i]->assemblyTraverseOrder]);
+            else
+              ext.fn[i] = NULL;
+          }
 
           CacheRecordPerSubIdx* CacheRecordPerSubIdxI;
 #pragma omp critical (cache_for_subidx_preparation)
-          CacheRecordPerSubIdxI = this->cache_records_sub_idx[current_vfvol[current_vfvol_i]->i][current_state->e[current_vfvol[current_vfvol_i]->i]->id]->find(current_state->sub_idx[current_vfvol[current_vfvol_i]->i])->second;
+          CacheRecordPerSubIdxI = this->cache_records_sub_idx[form->i][current_state->e[form->i]->id]->find(current_state->sub_idx[form->i])->second;
 
-          assemble_vector_form(current_vfvol[current_vfvol_i], 
-            CacheRecordPerSubIdxI->order, 
+          assemble_vector_form(form, 
             CacheRecordPerSubIdxI->fns, 
-            current_u_ext, 
-            current_als[current_vfvol[current_vfvol_i]->i], 
-            current_state, 
+            u_ext_funcs,
+            &ext,
+            current_als[form->i], 
             CacheRecordPerSubIdxI->n_quadrature_points,
             CacheRecordPerSubIdxI->geometry, 
             CacheRecordPerSubIdxI->jacobian_x_weights);
@@ -1811,24 +1852,36 @@ namespace Hermes
           {
             for(int current_mfsurf_i = 0; current_mfsurf_i < wf->mfsurf.size(); current_mfsurf_i++)
             {
-              if(!form_to_be_assembled(current_mfsurf[current_mfsurf_i], current_state))
+              MatrixFormSurf<Scalar>* form = current_mfsurf[current_mfsurf_i];
+
+              if(!form_to_be_assembled(form, current_state))
                 continue;
+
+              ExtData<Scalar> ext;
+              ext.nf = form->ext.size();
+              ext.fn = new Func<Scalar>*[ext.nf];
+              for (unsigned i = 0; i < ext.nf; i++)
+              {
+                if(form->ext[i] != NULL)
+                  ext.fn[i] = form->ext[i]->calculate(x_physSurf[current_state->isurf][form->ext[i]->assemblyTraverseOrder], y_physSurf[current_state->isurf][form->ext[i]->assemblyTraverseOrder], x_refSurf[current_state->isurf][form->ext[i]->assemblyTraverseOrder], y_refSurf[current_state->isurf][form->ext[i]->assemblyTraverseOrder], npSurf[current_state->isurf][form->ext[i]->assemblyTraverseOrder], inv_ref_mapSurf[current_state->isurf][form->ext[i]->assemblyTraverseOrder]);
+                else
+                  ext.fn[i] = NULL;
+              }
 
               CacheRecordPerSubIdx* CacheRecordPerSubIdxI;
               CacheRecordPerSubIdx* CacheRecordPerSubIdxJ;
   #pragma omp critical (cache_for_subidx_preparation)
-              CacheRecordPerSubIdxI = this->cache_records_sub_idx[current_mfsurf[current_mfsurf_i]->i][current_state->e[current_mfsurf[current_mfsurf_i]->i]->id]->find(current_state->sub_idx[current_mfsurf[current_mfsurf_i]->i])->second;
+              CacheRecordPerSubIdxI = this->cache_records_sub_idx[form->i][current_state->e[form->i]->id]->find(current_state->sub_idx[form->i])->second;
   #pragma omp critical (cache_for_subidx_preparation)
-              CacheRecordPerSubIdxJ = this->cache_records_sub_idx[current_mfsurf[current_mfsurf_i]->j][current_state->e[current_mfsurf[current_mfsurf_i]->j]->id]->find(current_state->sub_idx[current_mfsurf[current_mfsurf_i]->j])->second;
+              CacheRecordPerSubIdxJ = this->cache_records_sub_idx[form->j][current_state->e[form->j]->id]->find(current_state->sub_idx[form->j])->second;
 
-              assemble_matrix_form(current_mfsurf[current_mfsurf_i], 
-                CacheRecordPerSubIdxI->orderSurface[current_state->isurf], 
+              assemble_matrix_form(form, 
                 CacheRecordPerSubIdxJ->fnsSurface[current_state->isurf], 
                 CacheRecordPerSubIdxI->fnsSurface[current_state->isurf], 
-                current_u_ext, 
-                &current_alsSurface[current_mfsurf[current_mfsurf_i]->i][current_state->isurf], 
-                &current_alsSurface[current_mfsurf[current_mfsurf_i]->j][current_state->isurf], 
-                current_state, 
+                u_ext_funcsSurf[current_state->isurf], 
+                &ext,
+                &current_alsSurface[form->i][current_state->isurf], 
+                &current_alsSurface[form->j][current_state->isurf], 
                 CacheRecordPerSubIdxI->n_quadrature_pointsSurface[current_state->isurf], 
                 CacheRecordPerSubIdxI->geometrySurface[current_state->isurf], 
                 CacheRecordPerSubIdxI->jacobian_x_weightsSurface[current_state->isurf]);
@@ -1839,19 +1892,31 @@ namespace Hermes
           {
             for(int current_vfsurf_i = 0; current_vfsurf_i < wf->vfsurf.size(); current_vfsurf_i++)
             {
-              if(!form_to_be_assembled(current_vfsurf[current_vfsurf_i], current_state))
+              VectorFormSurf<Scalar>* form = current_vfsurf[current_vfsurf_i];
+
+              if(!form_to_be_assembled(form, current_state))
                 continue;
+
+              ExtData<Scalar> ext;
+              ext.nf = form->ext.size();
+              ext.fn = new Func<Scalar>*[ext.nf];
+              for (unsigned i = 0; i < ext.nf; i++)
+              {
+                if(form->ext[i] != NULL)
+                  ext.fn[i] = form->ext[i]->calculate(x_physSurf[current_state->isurf][form->ext[i]->assemblyTraverseOrder], y_physSurf[current_state->isurf][form->ext[i]->assemblyTraverseOrder], x_refSurf[current_state->isurf][form->ext[i]->assemblyTraverseOrder], y_refSurf[current_state->isurf][form->ext[i]->assemblyTraverseOrder], npSurf[current_state->isurf][form->ext[i]->assemblyTraverseOrder], inv_ref_mapSurf[current_state->isurf][form->ext[i]->assemblyTraverseOrder]);
+                else
+                  ext.fn[i] = NULL;
+              }
 
               CacheRecordPerSubIdx* CacheRecordPerSubIdxI;
   #pragma omp critical (cache_for_subidx_preparation)
-              CacheRecordPerSubIdxI = this->cache_records_sub_idx[current_vfsurf[current_vfsurf_i]->i][current_state->e[current_vfsurf[current_vfsurf_i]->i]->id]->find(current_state->sub_idx[current_vfsurf[current_vfsurf_i]->i])->second;
+              CacheRecordPerSubIdxI = this->cache_records_sub_idx[form->i][current_state->e[form->i]->id]->find(current_state->sub_idx[form->i])->second;
 
-              assemble_vector_form(current_vfsurf[current_vfsurf_i], 
-                CacheRecordPerSubIdxI->orderSurface[current_state->isurf], 
+              assemble_vector_form(form, 
                 CacheRecordPerSubIdxI->fnsSurface[current_state->isurf], 
-                current_u_ext, 
-                &current_alsSurface[current_vfsurf[current_vfsurf_i]->i][current_state->isurf], 
-                current_state, 
+                u_ext_funcsSurf[current_state->isurf], 
+                &ext,
+                &current_alsSurface[form->i][current_state->isurf], 
                 CacheRecordPerSubIdxI->n_quadrature_pointsSurface[current_state->isurf], 
                 CacheRecordPerSubIdxI->geometrySurface[current_state->isurf], 
                 CacheRecordPerSubIdxI->jacobian_x_weightsSurface[current_state->isurf]);
@@ -1922,116 +1987,8 @@ namespace Hermes
     }
 
     template<typename Scalar>
-    void DiscreteProblem<Scalar>::assemble_matrix_form(MatrixForm<Scalar>* form, int order, Func<double>** base_fns, Func<double>** test_fns, RefMap** current_refmaps, Solution<Scalar>** current_u_ext, AsmList<Scalar>** current_als, Traverse::State* current_state)
-    {
-      bool surface_form = (dynamic_cast<MatrixFormVol<Scalar>*>(form) == NULL);
-
-      double block_scaling_coef = this->block_scaling_coeff(form);
-
-      bool tra = (form->i != form->j) && (form->sym != 0);
-      bool sym = (form->i == form->j) && (form->sym == 1);
-
-      // Assemble the local stiffness matrix for the form form.
-      Scalar **local_stiffness_matrix = new_matrix<Scalar>(std::max(current_als[form->i]->cnt, current_als[form->j]->cnt));
-
-      // Init external functions.
-      Func<Scalar>** u_ext = new Func<Scalar>*[RungeKutta ? RK_original_spaces_count : this->wf->get_neq() - form->u_ext_offset];
-      ExtData<Scalar> ext;
-      init_ext(form, u_ext, &ext, order, current_u_ext, current_state);
-
-      // Add the previous time level solution previously inserted at the back of ext.
-      if(RungeKutta)
-        for(int ext_i = 0; ext_i < this->RK_original_spaces_count; ext_i++)
-          u_ext[ext_i]->add(*ext.fn[form->ext.size() - this->RK_original_spaces_count + ext_i]);
-
-      // Init geometry.
-      int n_quadrature_points;
-      Geom<double>* geometry = NULL;
-      double* jacobian_x_weights = NULL;
-      if(surface_form)
-        n_quadrature_points = init_surface_geometry_points(current_refmaps[form->i], order, current_state, geometry, jacobian_x_weights);
-      else
-        n_quadrature_points = init_geometry_points(current_refmaps[form->i], order, geometry, jacobian_x_weights);
-
-      // Actual form-specific calculation.
-      for (unsigned int i = 0; i < current_als[form->i]->cnt; i++)
-      {
-        if(current_als[form->i]->dof[i] < 0)
-          continue;
-
-        if((!tra || surface_form) && current_als[form->i]->dof[i] < 0)
-          continue;
-        if(std::abs(current_als[form->i]->coef[i]) < 1e-12)
-          continue;
-        if(!sym)
-        {
-          for (unsigned int j = 0; j < current_als[form->j]->cnt; j++)
-          {
-            if(current_als[form->j]->dof[j] >= 0)
-            {
-              // Is this necessary, i.e. is there a coefficient smaller than 1e-12?
-              if(std::abs(current_als[form->j]->coef[j]) < 1e-12)
-                continue;
-
-              Func<double>* u = base_fns[j];
-              Func<double>* v = test_fns[i];
-
-              if(surface_form)
-                local_stiffness_matrix[i][j] = 0.5 * block_scaling_coeff(form) * form->value(n_quadrature_points, jacobian_x_weights, u_ext, u, v, geometry, &ext) * form->scaling_factor * current_als[form->j]->coef[j] * current_als[form->i]->coef[i];
-              else
-                local_stiffness_matrix[i][j] = block_scaling_coeff(form) * form->value(n_quadrature_points, jacobian_x_weights, u_ext, u, v, geometry, &ext) * form->scaling_factor * current_als[form->j]->coef[j] * current_als[form->i]->coef[i];
-            }
-          }
-        }
-        // Symmetric block.
-        else
-        {
-          for (unsigned int j = 0; j < current_als[form->j]->cnt; j++)
-          {
-            if(j < i && current_als[form->j]->dof[j] >= 0)
-              continue;
-            if(current_als[form->j]->dof[j] >= 0)
-            {
-              // Is this necessary, i.e. is there a coefficient smaller than 1e-12?
-              if(std::abs(current_als[form->j]->coef[j]) < 1e-12)
-                continue;
-
-              Func<double>* u = base_fns[j];
-              Func<double>* v = test_fns[i];
-
-              Scalar val = block_scaling_coeff(form) * form->value(n_quadrature_points, jacobian_x_weights, u_ext, u, v, geometry, &ext) * form->scaling_factor * current_als[form->j]->coef[j] * current_als[form->i]->coef[i];
-
-              local_stiffness_matrix[i][j] = local_stiffness_matrix[j][i] = val;
-            }
-          }
-        }
-      }
-
-      // Insert the local stiffness matrix into the global one.
-
-      current_mat->add(current_als[form->i]->cnt, current_als[form->j]->cnt, local_stiffness_matrix, current_als[form->i]->dof, current_als[form->j]->dof);
-
-      // Insert also the off-diagonal (anti-)symmetric block, if required.
-      if(tra)
-      {
-        if(form->sym < 0)
-          chsgn(local_stiffness_matrix, current_als[form->i]->cnt, current_als[form->j]->cnt);
-        transpose(local_stiffness_matrix, current_als[form->i]->cnt, current_als[form->j]->cnt);
-
-        current_mat->add(current_als[form->j]->cnt, current_als[form->i]->cnt, local_stiffness_matrix, current_als[form->j]->dof, current_als[form->i]->dof);
-      }
-
-      // Cleanup.
-      deinit_ext(form, u_ext, &ext);
-      delete [] local_stiffness_matrix;
-      delete [] jacobian_x_weights;
-      geometry->free();
-      delete geometry;
-    }
-
-    template<typename Scalar>
-    void DiscreteProblem<Scalar>::assemble_matrix_form(MatrixForm<Scalar>* form, int order, Func<double>** base_fns, Func<double>** test_fns, Solution<Scalar>** current_u_ext, 
-      AsmList<Scalar>* current_als_i, AsmList<Scalar>* current_als_j, Traverse::State* current_state, int n_quadrature_points, Geom<double>* geometry, double* jacobian_x_weights)
+    void DiscreteProblem<Scalar>::assemble_matrix_form(MatrixForm<Scalar>* form, Func<double>** base_fns, Func<double>** test_fns, Func<Scalar>** u_ext, ExtData<Scalar>* ext,
+      AsmList<Scalar>* current_als_i, AsmList<Scalar>* current_als_j, int n_quadrature_points, Geom<double>* geometry, double* jacobian_x_weights)
     {
       bool surface_form = (dynamic_cast<MatrixFormVol<Scalar>*>(form) == NULL);
 
@@ -2043,15 +2000,11 @@ namespace Hermes
       // Assemble the local stiffness matrix for the form form.
       Scalar **local_stiffness_matrix = new_matrix<Scalar>(std::max(current_als_i->cnt, current_als_j->cnt));
 
-      // Init external functions.
-      Func<Scalar>** u_ext = new Func<Scalar>*[RungeKutta ? RK_original_spaces_count : this->wf->get_neq() - form->u_ext_offset];
-      ExtData<Scalar> ext;
-      //init_ext(form, u_ext, &ext, order, current_u_ext, current_state);
-
-      // Add the previous time level solution previously inserted at the back of ext.
+      // External functions adjustment (almost exclusively for RungeKutta)
+      u_ext += form->u_ext_offset;
       if(RungeKutta)
         for(int ext_i = 0; ext_i < this->RK_original_spaces_count; ext_i++)
-          u_ext[ext_i]->add(*ext.fn[form->ext.size() - this->RK_original_spaces_count + ext_i]);
+          u_ext[ext_i]->add(*ext->fn[form->ext.size() - this->RK_original_spaces_count + ext_i]);
 
       // Actual form-specific calculation.
       for (unsigned int i = 0; i < current_als_i->cnt; i++)
@@ -2077,9 +2030,9 @@ namespace Hermes
               Func<double>* v = test_fns[i];
 
               if(surface_form)
-                local_stiffness_matrix[i][j] = 0.5 * block_scaling_coeff(form) * form->value(n_quadrature_points, jacobian_x_weights, u_ext, u, v, geometry, &ext) * form->scaling_factor * current_als_j->coef[j] * current_als_i->coef[i];
+                local_stiffness_matrix[i][j] = 0.5 * block_scaling_coeff(form) * form->value(n_quadrature_points, jacobian_x_weights, u_ext, u, v, geometry, ext) * form->scaling_factor * current_als_j->coef[j] * current_als_i->coef[i];
               else
-                local_stiffness_matrix[i][j] = block_scaling_coeff(form) * form->value(n_quadrature_points, jacobian_x_weights, u_ext, u, v, geometry, &ext) * form->scaling_factor * current_als_j->coef[j] * current_als_i->coef[i];
+                local_stiffness_matrix[i][j] = block_scaling_coeff(form) * form->value(n_quadrature_points, jacobian_x_weights, u_ext, u, v, geometry, ext) * form->scaling_factor * current_als_j->coef[j] * current_als_i->coef[i];
             }
           }
         }
@@ -2099,7 +2052,7 @@ namespace Hermes
               Func<double>* u = base_fns[j];
               Func<double>* v = test_fns[i];
 
-              Scalar val = block_scaling_coeff(form) * form->value(n_quadrature_points, jacobian_x_weights, u_ext, u, v, geometry, &ext) * form->scaling_factor * current_als_j->coef[j] * current_als_i->coef[i];
+              Scalar val = block_scaling_coeff(form) * form->value(n_quadrature_points, jacobian_x_weights, u_ext, u, v, geometry, ext) * form->scaling_factor * current_als_j->coef[j] * current_als_i->coef[i];
 
               local_stiffness_matrix[i][j] = local_stiffness_matrix[j][i] = val;
             }
@@ -2122,7 +2075,7 @@ namespace Hermes
       }
 
       // Cleanup.
-      deinit_ext(form, u_ext, &ext);
+      u_ext -= form->u_ext_offset;
       delete [] local_stiffness_matrix;
     }
 
@@ -2170,73 +2123,16 @@ namespace Hermes
     }
 
     template<typename Scalar>
-    void DiscreteProblem<Scalar>::assemble_vector_form(VectorForm<Scalar>* form, int order, Func<double>** test_fns, RefMap** current_refmaps, Solution<Scalar>** current_u_ext, AsmList<Scalar>** current_als, Traverse::State* current_state)
+    void DiscreteProblem<Scalar>::assemble_vector_form(VectorForm<Scalar>* form, Func<double>** test_fns, Func<Scalar>** u_ext, ExtData<Scalar>* ext,
+      AsmList<Scalar>* current_als_i, int n_quadrature_points, Geom<double>* geometry, double* jacobian_x_weights)
     {
       bool surface_form = (dynamic_cast<VectorFormVol<Scalar>*>(form) == NULL);
 
-      // Init geometry.
-      int n_quadrature_points;
-      Geom<double>* geometry = NULL;
-      double* jacobian_x_weights = NULL;
-
-      if(surface_form)
-        n_quadrature_points = init_surface_geometry_points(current_refmaps[form->i], order, current_state, geometry, jacobian_x_weights);
-      else
-        n_quadrature_points = init_geometry_points(current_refmaps[form->i], order, geometry, jacobian_x_weights);
-
-      // Init external functions.
-      Func<Scalar>** u_ext = new Func<Scalar>*[RungeKutta ? RK_original_spaces_count : this->wf->get_neq() - form->u_ext_offset];
-      ExtData<Scalar> ext;
-      init_ext(form, u_ext, &ext, order, current_u_ext, current_state);
-
-      // Add the previous time level solution previously inserted at the back of ext.
+      // External functions adjustment (almost exclusively for RungeKutta)
+      u_ext += form->u_ext_offset;
       if(RungeKutta)
         for(int ext_i = 0; ext_i < this->RK_original_spaces_count; ext_i++)
-          u_ext[ext_i]->add(*ext.fn[form->ext.size() - this->RK_original_spaces_count + ext_i]);
-
-      // Actual form-specific calculation.
-      for (unsigned int i = 0; i < current_als[form->i]->cnt; i++)
-      {
-        if(current_als[form->i]->dof[i] < 0)
-          continue;
-
-        // Is this necessary, i.e. is there a coefficient smaller than 1e-12?
-        if(std::abs(current_als[form->i]->coef[i]) < 1e-12)
-          continue;
-
-        Func<double>* v = test_fns[i];
-
-        Scalar val;
-        if(surface_form)
-          val = 0.5 * form->value(n_quadrature_points, jacobian_x_weights, u_ext, v, geometry, &ext) * form->scaling_factor * current_als[form->i]->coef[i];
-        else
-          val = form->value(n_quadrature_points, jacobian_x_weights, u_ext, v, geometry, &ext) * form->scaling_factor * current_als[form->i]->coef[i];
-
-        current_rhs->add(current_als[form->i]->dof[i], val);
-      }
-
-      // Cleanup.
-      deinit_ext(form, u_ext, &ext);
-      delete [] jacobian_x_weights;
-      geometry->free();
-      delete geometry;
-    }
-
-    template<typename Scalar>
-    void DiscreteProblem<Scalar>::assemble_vector_form(VectorForm<Scalar>* form, int order, Func<double>** test_fns, Solution<Scalar>** current_u_ext, 
-      AsmList<Scalar>* current_als_i, Traverse::State* current_state, int n_quadrature_points, Geom<double>* geometry, double* jacobian_x_weights)
-    {
-      bool surface_form = (dynamic_cast<VectorFormVol<Scalar>*>(form) == NULL);
-
-      // Init external functions.
-      Func<Scalar>** u_ext = new Func<Scalar>*[RungeKutta ? RK_original_spaces_count : this->wf->get_neq() - form->u_ext_offset];
-      ExtData<Scalar> ext;
-      //init_ext(form, u_ext, &ext, order, current_u_ext, current_state);
-
-      // Add the previous time level solution previously inserted at the back of ext.
-      if(RungeKutta)
-        for(int ext_i = 0; ext_i < this->RK_original_spaces_count; ext_i++)
-          u_ext[ext_i]->add(*ext.fn[form->ext.size() - this->RK_original_spaces_count + ext_i]);
+          u_ext[ext_i]->add(*ext->fn[form->ext.size() - this->RK_original_spaces_count + ext_i]);
 
       // Actual form-specific calculation.
       for (unsigned int i = 0; i < current_als_i->cnt; i++)
@@ -2252,15 +2148,15 @@ namespace Hermes
 
         Scalar val;
         if(surface_form)
-          val = 0.5 * form->value(n_quadrature_points, jacobian_x_weights, u_ext, v, geometry, &ext) * form->scaling_factor * current_als_i->coef[i];
+          val = 0.5 * form->value(n_quadrature_points, jacobian_x_weights, u_ext, v, geometry, ext) * form->scaling_factor * current_als_i->coef[i];
         else
-          val = form->value(n_quadrature_points, jacobian_x_weights, u_ext, v, geometry, &ext) * form->scaling_factor * current_als_i->coef[i];
+          val = form->value(n_quadrature_points, jacobian_x_weights, u_ext, v, geometry, ext) * form->scaling_factor * current_als_i->coef[i];
 
         current_rhs->add(current_als_i->dof[i], val);
       }
 
       // Cleanup.
-      deinit_ext(form, u_ext, &ext);
+      u_ext -= form->u_ext_offset;
     }
 
     template<typename Scalar>

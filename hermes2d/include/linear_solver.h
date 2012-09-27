@@ -34,7 +34,7 @@ namespace Hermes
     class LinearSolver : public Hermes::Mixins::Loggable, public Hermes::Mixins::TimeMeasurable, public Hermes::Mixins::IntegrableWithGlobalOrder, public Hermes::Mixins::SettableComputationTime, public Hermes::Hermes2D::Mixins::SettableSpaces<Scalar>, public Hermes::Mixins::OutputAttachable, public Hermes::Hermes2D::Mixins::MatrixRhsOutput<Scalar>
     {
     public:
-      LinearSolver(DiscreteProblemLinear<Scalar>* dp);
+      LinearSolver(DiscreteProblem<Scalar>* dp);
       LinearSolver(const WeakForm<Scalar>* wf, const Space<Scalar>* space);
       LinearSolver(const WeakForm<Scalar>* wf, Hermes::vector<const Space<Scalar>*> spaces);
       void init();

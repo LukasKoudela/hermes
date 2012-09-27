@@ -14,6 +14,7 @@
 // along with Hermes2D.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "exact_solution.h"
+#include "../forms.h"
 
 #include "solution_h2d_xml.h"
 
@@ -970,23 +971,23 @@ namespace Hermes
     }
 
     template<typename Scalar>
-    Func<Scalar>* Solution<Scalar>::calculate(double* x_phys, double* y_phys, double* x_ref, double* y_ref, int np, double2x2* inv_ref_map) const
+    Func<Scalar>* Solution<Scalar>::calculate(double* x_phys, double* y_phys, double* x_ref, double* y_ref, int np, double2x2* inv_ref_map)
     {
-      Func<double>* u = new Func<double>(np, this->num_components);
+      Func<Scalar>* u = new Func<Scalar>(np, this->num_components);
       SpaceType space_type = this->get_space_type();
 
-      double*** result = new double**[2];
-      result[0] = new double*[3];
-      result[0][0] = new double[np];
-      result[0][1] = new double[np];
-      result[0][2] = new double[np];
+      Scalar*** result = new Scalar**[2];
+      result[0] = new Scalar*[3];
+      result[0][0] = new Scalar[np];
+      result[0][1] = new Scalar[np];
+      result[0][2] = new Scalar[np];
 
       if(this->num_components > 1)
       {
-        result[0] = new double*[3];
-        result[0][0] = new double[np];
-        result[0][1] = new double[np];
-        result[0][2] = new double[np];
+        result[1] = new Scalar*[3];
+        result[1][0] = new Scalar[np];
+        result[1][1] = new Scalar[np];
+        result[1][2] = new Scalar[np];
       }
 
       if(sln_type == HERMES_SLN)
@@ -1005,21 +1006,21 @@ namespace Hermes
             {
               set_vec_num(np, tx, *mono++);
               for (int j = 1; j <= (this->mode ? o : i); j++)
-                vec_x_vec_p_num(np, tx, x_ref, *mono++);
+                vec_x_vec_p_num(np, tx, (Scalar*)x_ref, *mono++);
 
               if(!i)
                 memcpy(result[l][k], tx, sizeof(Scalar)*np);
               else
-                vec_x_vec_p_vec(np, result[l][k], y_ref, tx);
+                vec_x_vec_p_vec(np, result[l][k], (Scalar*)y_ref, tx);
             }
           }
         }
 
         if(space_type == HERMES_H1_SPACE || space_type == HERMES_L2_SPACE)
         {
-          u->val = new double[np];
-          u->dx = new double[np];
-          u->dy = new double[np];
+          u->val = new Scalar[np];
+          u->dx = new Scalar[np];
+          u->dy = new Scalar[np];
           for (int i = 0; i < np; i++, inv_ref_map++)
           {
             u->val[i] = result[0][0][i];
@@ -1029,9 +1030,9 @@ namespace Hermes
         }
         else if(space_type == HERMES_HCURL_SPACE)
         {
-          u->val0 = new double[np];
-          u->val1 = new double[np];
-          u->curl = new double[np];
+          u->val0 = new Scalar[np];
+          u->val1 = new Scalar[np];
+          u->curl = new Scalar[np];
           for (int i = 0; i < np; i++, inv_ref_map++)
           {
             u->val0[i] = (result[0][0][i] * (*inv_ref_map)[0][0] + result[1][0][i] * (*inv_ref_map)[0][1]);
@@ -1042,9 +1043,9 @@ namespace Hermes
         // Hdiv space.
         else if(space_type == HERMES_HDIV_SPACE)
         {
-          u->val0 = new double[np];
-          u->val1 = new double[np];
-          u->div = new double[np];
+          u->val0 = new Scalar[np];
+          u->val1 = new Scalar[np];
+          u->div = new Scalar[np];
           for (int i = 0; i < np; i++, inv_ref_map++)
           {
             u->val0[i] = (  result[0][0][i] * (*inv_ref_map)[1][1] - result[1][0][i] * (*inv_ref_map)[1][0]);
@@ -1061,9 +1062,9 @@ namespace Hermes
         // evaluate the exact solution
         if(this->num_components == 1)
         {
-          u->val = new double[np];
-          u->dx = new double[np];
-          u->dy = new double[np];
+          u->val = new Scalar[np];
+          u->dx = new Scalar[np];
+          u->dy = new Scalar[np];
           for (int i = 0; i < np; i++)
           {
             Scalar val, dx = 0.0, dy = 0.0;
@@ -1076,12 +1077,12 @@ namespace Hermes
         }
         else
         {
-          u->val0 = new double[np];
-          u->val1 = new double[np];
-          u->dx0 = new double[np];
-          u->dx1 = new double[np];
-          u->dy0 = new double[np];
-          u->dy1 = new double[np];
+          u->val0 = new Scalar[np];
+          u->val1 = new Scalar[np];
+          u->dx0 = new Scalar[np];
+          u->dx1 = new Scalar[np];
+          u->dy0 = new Scalar[np];
+          u->dy1 = new Scalar[np];
           for (int i = 0; i < np; i++)
           {
             Scalar2<Scalar> dx (0.0, 0.0 ), dy ( 0.0, 0.0 );
@@ -1104,10 +1105,10 @@ namespace Hermes
 
       if(this->num_components > 1)
       {
-        delete [] result[0][0];
-        delete [] result[0][1];
-        delete [] result[0][2];
-        delete [] result[0];
+        delete [] result[1][0];
+        delete [] result[1][1];
+        delete [] result[1][2];
+        delete [] result[1];
       }
       delete [] result;
 

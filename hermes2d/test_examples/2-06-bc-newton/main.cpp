@@ -45,6 +45,8 @@ bool sranda(int id)
 
 int main(int argc, char* argv[])
 {
+  Hermes::Hermes2D::Hermes2DApi.set_param_value(Hermes::Hermes2D::numThreads, 1);
+
   // Load the mesh.
   Hermes::Hermes2D::Mesh mesh;
   Hermes::Hermes2D::MeshReaderH2D mloader;
@@ -71,16 +73,6 @@ int main(int argc, char* argv[])
 
   // Initialize the Newton solver.
   Hermes::Hermes2D::NewtonSolver<double> newton(&wf, &space);
-  newton.output_matrix();
-  newton.output_rhs(1);
-  newton.set_matrix_filename("asdf");
-  newton.set_rhs_E_matrix_dump_format(Hermes::Algebra::DF_HERMES_BIN);
-  newton.set_matrix_varname("aasdfgasdasdggasdgas");
-
-  Hermes::Hermes2D::Space<double>* ref_space = Hermes::Hermes2D::Space<double>::construct_refined_space(&space, 1, *sranda);
-
-  Hermes::Hermes2D::Views::OrderView o;
-  o.show(ref_space);
 
   // Perform Newton's iteration and translate the resulting coefficient vector into a Solution.
   Hermes::Hermes2D::Solution<double> sln;
@@ -91,6 +83,7 @@ int main(int argc, char* argv[])
   {
     e.print_msg();
   }
+
   Hermes::Hermes2D::Solution<double>::vector_to_solution(newton.get_sln_vector(), &space, &sln);
 
   // VTK output.

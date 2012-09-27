@@ -149,6 +149,7 @@ namespace Hermes
       this->rep = other->rep;
       this->visited = other->visited;
       this->isurf = other->isurf;
+      this->isBnd = other->isBnd;
     }
 
     Traverse::State::~State()
