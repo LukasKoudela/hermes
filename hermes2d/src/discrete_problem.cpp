@@ -1123,7 +1123,7 @@ namespace Hermes
             }
           }
           if(foundMesh)
-            break;
+            continue;
           else
           {
             meshes.push_back(this->wf->mfvol.at(form_i)->ext[ext_i]->get_mesh());
@@ -1151,7 +1151,7 @@ namespace Hermes
             }
           }
           if(foundMesh)
-            break;
+            continue;
           else
           {
             meshes.push_back(this->wf->mfsurf.at(form_i)->ext[ext_i]->get_mesh());
@@ -1179,7 +1179,7 @@ namespace Hermes
             }
           }
           if(foundMesh)
-            break;
+            continue;
           else
           {
             meshes.push_back(this->wf->mfDG.at(form_i)->ext[ext_i]->get_mesh());
@@ -1207,7 +1207,7 @@ namespace Hermes
             }
           }
           if(foundMesh)
-            break;
+            continue;
           else
           {
             meshes.push_back(this->wf->vfvol.at(form_i)->ext[ext_i]->get_mesh());
@@ -1235,7 +1235,7 @@ namespace Hermes
             }
           }
           if(foundMesh)
-            break;
+            continue;
           else
           {
             meshes.push_back(this->wf->vfsurf.at(form_i)->ext[ext_i]->get_mesh());
@@ -1264,7 +1264,7 @@ namespace Hermes
             }
           }
           if(foundMesh)
-            break;
+            continue;
           else
           {
             meshes.push_back(this->wf->vfDG.at(form_i)->ext[ext_i]->get_mesh());
@@ -1437,6 +1437,11 @@ namespace Hermes
     }
 
     template<typename Scalar>
+    DiscreteProblem<Scalar>::CacheRecordPerSubIdx::CacheRecordPerSubIdx() : fnsSurface(NULL)
+    {
+    }
+
+    template<typename Scalar>
     void DiscreteProblem<Scalar>::CacheRecordPerSubIdx::clear()
     {
       for(unsigned int i = 0; i < this->asmlistCnt; i++)
@@ -1450,29 +1455,32 @@ namespace Hermes
       this->geometry->free();
       delete this->geometry;
 
-      for(unsigned int edge_i = 0; edge_i < nvert; edge_i++)
+      if(fnsSurface != NULL)
       {
-        if(this->fnsSurface[edge_i] == NULL)
-          continue;
-        delete [] this->jacobian_x_weightsSurface[edge_i];
-        this->geometrySurface[edge_i]->free();
-        delete this->geometrySurface[edge_i];
-
-        for(unsigned int i = 0; i < this->asmlistSurfaceCnt[edge_i]; i++)
+        for(unsigned int edge_i = 0; edge_i < nvert; edge_i++)
         {
-          this->fnsSurface[edge_i][i]->free_fn();
-          delete this->fnsSurface[edge_i][i];
-        }
-        delete [] this->fnsSurface[edge_i];
-      }
+          if(this->fnsSurface[edge_i] == NULL)
+            continue;
+          delete [] this->jacobian_x_weightsSurface[edge_i];
+          this->geometrySurface[edge_i]->free();
+          delete this->geometrySurface[edge_i];
 
-      delete [] this->fnsSurface;
-      delete [] this->geometrySurface;
-      delete [] this->jacobian_x_weightsSurface;
+          for(unsigned int i = 0; i < this->asmlistSurfaceCnt[edge_i]; i++)
+          {
+            this->fnsSurface[edge_i][i]->free_fn();
+            delete this->fnsSurface[edge_i][i];
+          }
+          delete [] this->fnsSurface[edge_i];
+        }
+
+        delete [] this->fnsSurface;
+        delete [] this->geometrySurface;
+        delete [] this->jacobian_x_weightsSurface;
       
-      delete [] this->n_quadrature_pointsSurface;
-      delete [] this->orderSurface;
-      delete [] this->asmlistSurfaceCnt;
+        delete [] this->n_quadrature_pointsSurface;
+        delete [] this->orderSurface;
+        delete [] this->asmlistSurfaceCnt;
+      }
     }
 
     template<typename Scalar>
@@ -1514,6 +1522,40 @@ namespace Hermes
       double2x2*** inv_ref_mapSurf;
       // The u_ext - previous Newton iterations - functions.
       Func<Scalar>*** u_ext_funcsSurf;
+
+      // if surface is really needed.
+      bool isNaturalBndCondition[4];
+      if(current_state->isBnd)
+      {
+        current_state->isBnd = false;
+        for (current_state->isurf = 0; current_state->isurf < current_state->rep->nvert; current_state->isurf++)
+        {
+          isNaturalBndCondition[current_state->isurf] = false;
+          if(!current_state->bnd[current_state->isurf])
+            continue;
+          for(int current_mfsurf_i = 0; current_mfsurf_i < wf->mfsurf.size(); current_mfsurf_i++)
+          {
+            MatrixFormSurf<Scalar>* form = current_mfsurf[current_mfsurf_i];
+            if(form_to_be_assembled(form, current_state))
+            {
+              isNaturalBndCondition[current_state->isurf] = true;
+              current_state->isBnd = true;
+              break;
+            }
+          }
+          for(int current_vfsurf_i = 0; current_vfsurf_i < wf->vfsurf.size(); current_vfsurf_i++)
+          {
+            VectorFormSurf<Scalar>* form = current_vfsurf[current_vfsurf_i];
+            if(form_to_be_assembled(form, current_state))
+            {
+              isNaturalBndCondition[current_state->isurf] = true;
+              current_state->isBnd = true;
+              break;
+            }
+          }
+        }
+      }
+
       if(current_state->isBnd)
       {
         xy_refSurf = new double3**[4];
@@ -1563,8 +1605,9 @@ namespace Hermes
         {
           for (current_state->isurf = 0; current_state->isurf < current_state->rep->nvert; current_state->isurf++)
           {
-            if(!current_state->bnd[current_state->isurf])
+            if(!isNaturalBndCondition[current_state->isurf])
               continue;
+
             int surfOrder = order;
 
             surfOrder = refmaps[num_i]->get_quad_2d()->get_edge_points(current_state->isurf, surfOrder, current_state->e[num_i]->get_mode());
@@ -1625,7 +1668,7 @@ namespace Hermes
         current_alsSurface[spaces_i] = new AsmList<Scalar>[current_state->rep->nvert];
         for (current_state->isurf = 0; current_state->isurf < current_state->rep->nvert; current_state->isurf++)
         {
-          if(!current_state->bnd[current_state->isurf])
+          if(!isNaturalBndCondition[current_state->isurf])
             continue;
 
           spaces[spaces_i]->get_boundary_assembly_list(current_state->e[spaces_i], current_state->isurf, &current_alsSurface[spaces_i][current_state->isurf], spaces_first_dofs[spaces_i]);
@@ -1695,8 +1738,14 @@ namespace Hermes
           newRecord->asmlistCnt = current_als[spaces_i]->cnt;
           for (unsigned int j = 0; j < current_als[spaces_i]->cnt; j++)
           {
-            precalc.set_shape_index(current_als[spaces_i]->idx[j]);
-            newRecord->fns[j] = precalc.calculate(xy_ref[spaces_i], np[spaces_i], inv_ref_map[spaces_i]);
+            //precalc.set_shape_index(current_als[spaces_i]->idx[j]);
+            //newRecord->fns[j] = precalc.calculate(xy_ref[spaces_i], np[spaces_i], inv_ref_map[spaces_i]);
+
+            refmaps[spaces_i]->set_active_element(current_state->e[spaces_i]);
+            //precalc.set_master_transform();
+            refmaps[spaces_i]->force_transform(precalc.get_transform(), precalc.get_ctm());
+            precalc.set_active_shape(current_als[spaces_i]->idx[j]);
+            newRecord->fns[j] = init_fn(&precalc, refmaps[spaces_i], newRecord->order);
           }
           
           newRecord->n_quadrature_points = init_geometry_points(refmaps[spaces_i], newRecord->order, newRecord->geometry, newRecord->jacobian_x_weights);
@@ -1727,7 +1776,7 @@ namespace Hermes
             int order = newRecord->order;
             for (current_state->isurf = 0; current_state->isurf < newRecord->nvert; current_state->isurf++)
             {
-              if(!current_state->bnd[current_state->isurf])
+              if(!isNaturalBndCondition[current_state->isurf])
                 continue;
 
               newRecord->n_quadrature_pointsSurface[current_state->isurf] = init_surface_geometry_points(refmaps[spaces_i], order, current_state, newRecord->geometrySurface[current_state->isurf], newRecord->jacobian_x_weightsSurface[current_state->isurf]);
@@ -1761,7 +1810,7 @@ namespace Hermes
           {
             for (current_state->isurf = 0; current_state->isurf < current_state->rep->nvert; current_state->isurf++)
             {
-              if(!current_state->bnd[current_state->isurf])
+              if(!isNaturalBndCondition[current_state->isurf])
                 continue;
               u_ext_funcsSurf[current_state->isurf][spaces_i] = current_u_ext[spaces_i]->calculate(x_physSurf[current_state->isurf][spaces_i], y_physSurf[current_state->isurf][spaces_i], x_ref[spaces_i], y_refSurf[current_state->isurf][spaces_i], npSurf[current_state->isurf][spaces_i], inv_ref_mapSurf[current_state->isurf][spaces_i]);
             }
@@ -1845,7 +1894,7 @@ namespace Hermes
       {
         for (current_state->isurf = 0; current_state->isurf < current_state->rep->nvert; current_state->isurf++)
         {
-          if(!current_state->bnd[current_state->isurf])
+          if(!isNaturalBndCondition[current_state->isurf])
             continue;
 
           if(current_mat != NULL)

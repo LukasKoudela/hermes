@@ -133,6 +133,9 @@ namespace Hermes
         Table* block_weights = NULL);
 
     protected:
+      /// Init function. Common code for the constructors.
+      void init();
+
       void init_assembling(Scalar* coeff_vec, Solution<Scalar>*** u_ext, AsmList<Scalar>*** als, Hermes::vector<MeshFunction<Scalar>*>& ext_functions, MeshFunction<Scalar>*** ext,
           Hermes::vector<MatrixFormVol<Scalar>*>* mfvol, Hermes::vector<MatrixFormSurf<Scalar>*>* mfsurf, Hermes::vector<MatrixFormDG<Scalar>*>* mfDG, Hermes::vector<VectorFormVol<Scalar>*>* vfvol, Hermes::vector<VectorFormSurf<Scalar>*>* vfsurf, Hermes::vector<VectorFormDG<Scalar>*>* vfDG);
 
@@ -208,9 +211,6 @@ namespace Hermes
       /// Cleans up after init_ext.
       void deinit_ext(Form<Scalar> *form, Func<Scalar>** u_ext, ExtData<Scalar>* ext);
 
-      /// Init function. Common code for the constructors.
-      void init();
-
       /// Matrix structure as well as spaces and weak formulation is up-to-date.
       bool is_up_to_date() const;
 
@@ -275,6 +275,7 @@ namespace Hermes
       class CacheRecordPerSubIdx
       {
       public:
+        CacheRecordPerSubIdx();
         int order;
         int nvert;
         void clear();
