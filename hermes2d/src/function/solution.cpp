@@ -971,7 +971,7 @@ namespace Hermes
     }
 
     template<typename Scalar>
-    Func<Scalar>* Solution<Scalar>::calculate(double* x_phys, double* y_phys, double* x_ref, double* y_ref, int np, double2x2* inv_ref_map)
+    Func<Scalar>* Solution<Scalar>::calculate(double* x_phys, double* y_phys, double* x_ref, double* y_ref, int np)
     {
       Func<Scalar>* u = new Func<Scalar>(np, this->num_components);
       SpaceType space_type = this->get_space_type();
@@ -1024,20 +1024,24 @@ namespace Hermes
           for (int i = 0; i < np; i++, inv_ref_map++)
           {
             u->val[i] = result[0][0][i];
-            u->dx[i] = (result[0][1][i] * (*inv_ref_map)[0][0] + result[0][2][i] * (*inv_ref_map)[0][1]);
-            u->dy[i] = (result[0][1][i] * (*inv_ref_map)[1][0] + result[0][2][i] * (*inv_ref_map)[1][1]);
+            u->dx[i] = result[0][1][i];
+            u->dy[i] = result[0][2][i];
           }
         }
         else if(space_type == HERMES_HCURL_SPACE)
         {
           u->val0 = new Scalar[np];
           u->val1 = new Scalar[np];
+          u->dx1 = new double[np];
+          u->dy0 = new double[np];
           u->curl = new Scalar[np];
+
           for (int i = 0; i < np; i++, inv_ref_map++)
           {
-            u->val0[i] = (result[0][0][i] * (*inv_ref_map)[0][0] + result[1][0][i] * (*inv_ref_map)[0][1]);
-            u->val1[i] = (result[0][0][i] * (*inv_ref_map)[1][0] + result[1][0][i] * (*inv_ref_map)[1][1]);
-            u->curl[i] = ((*inv_ref_map)[0][0] * (*inv_ref_map)[1][1] - (*inv_ref_map)[1][0] * (*inv_ref_map)[0][1]) * (result[1][1][i] - result[0][2][i]);
+            u->val0[i] = result[0][0][i];
+            u->val1[i] = result[1][0][i];
+            u->dx1[i] = result[1][1][i];
+            u->dy0[i] = result[0][2][i];
           }
         }
         // Hdiv space.
@@ -1045,12 +1049,15 @@ namespace Hermes
         {
           u->val0 = new Scalar[np];
           u->val1 = new Scalar[np];
+          u->dx0 = new double[np];
+          u->dy1 = new double[np];
           u->div = new Scalar[np];
           for (int i = 0; i < np; i++, inv_ref_map++)
           {
-            u->val0[i] = (  result[0][0][i] * (*inv_ref_map)[1][1] - result[1][0][i] * (*inv_ref_map)[1][0]);
-            u->val1[i] = (- result[0][0][i] * (*inv_ref_map)[0][1] + result[1][0][i] * (*inv_ref_map)[0][0]);
-            u->div[i] = ((*inv_ref_map)[0][0] * (*inv_ref_map)[1][1] - (*inv_ref_map)[1][0] * (*inv_ref_map)[0][1]) * (result[0][1][i] + result[1][2][i]);
+            u->val0[i] = result[0][0][i];
+            u->val1[i] = result[1][0][i];
+            u->dx0[i] = result[0][1][i];
+            u->dy1[i] = result[1][2][i];
           }
         }
 

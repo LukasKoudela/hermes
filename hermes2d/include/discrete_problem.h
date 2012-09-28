@@ -136,6 +136,31 @@ namespace Hermes
       /// Init function. Common code for the constructors.
       void init();
 
+      /// Initializes integration order.
+      /// Sets integration_order attribute.
+      /// Sets num_integration_points, num_integration_points_surf attributes.
+      void assemble_init_integration_order();
+
+      /// Performs basic checks in assemble.
+      void assemble_check();
+
+      /// Performs initialization in assemble.
+      void assemble_init_ext_functions(std::set<MeshFunction<Scalar>*> ext_functions, Hermes::vector<const Mesh*> meshes);
+
+      /// Performs initialization in assemble.
+      void assemble_init(SparseMatrix<Scalar>* mat, Vector<Scalar>* rhs, bool force_diagonal_blocks, Table* block_weights, Scalar* coeff_vec, Solution<Scalar>*** u_ext, AsmList<Scalar>*** als, Hermes::vector<MeshFunction<Scalar>*>& ext_functions, MeshFunction<Scalar>*** ext,
+          Hermes::vector<MatrixFormVol<Scalar>*>* mfvol, Hermes::vector<MatrixFormSurf<Scalar>*>* mfsurf, Hermes::vector<MatrixFormDG<Scalar>*>* mfDG, Hermes::vector<VectorFormVol<Scalar>*>* vfvol, Hermes::vector<VectorFormSurf<Scalar>*>* vfsurf, Hermes::vector<VectorFormDG<Scalar>*>* vfDG);
+
+      /// Precalculates all necessary basis / test functions.
+      /// Fills the structure precalculated_shapesets.
+      void assemble_calculate_precalculated_shapesets(Hermes::vector<const Mesh*> meshes);
+
+      /// Investigates if surface forms are to be assembled and prepared in this state.
+      bool state_boundary_info(Traverse::State* current_state, bool* isNaturalBndCondition, MatrixFormSurf<Scalar>** current_mfsurf, VectorFormSurf<Scalar>** current_vfsurf);
+
+      /// Decides whether or not this state information are possible to be found in the cache.
+      bool element_changed(Traverse::State* current_state, AsmList<Scalar>** current_als);
+
       void init_assembling(Scalar* coeff_vec, Solution<Scalar>*** u_ext, AsmList<Scalar>*** als, Hermes::vector<MeshFunction<Scalar>*>& ext_functions, MeshFunction<Scalar>*** ext,
           Hermes::vector<MatrixFormVol<Scalar>*>* mfvol, Hermes::vector<MatrixFormSurf<Scalar>*>* mfsurf, Hermes::vector<MatrixFormDG<Scalar>*>* mfDG, Hermes::vector<VectorFormVol<Scalar>*>* vfvol, Hermes::vector<VectorFormSurf<Scalar>*>* vfsurf, Hermes::vector<VectorFormDG<Scalar>*>* vfDG);
 
@@ -172,7 +197,7 @@ namespace Hermes
       inline void set_RK(int original_spaces_count) { this->RungeKutta = true; RK_original_spaces_count = original_spaces_count; }
 
       /// Assemble one state.
-      void assemble_one_state(Solution<Scalar>** current_u_ext, AsmList<Scalar>** current_als, Traverse::State* current_state,
+      void assemble_one_state(Solution<Scalar>** current_u_ext, AsmList<Scalar>** current_als, std::set<MeshFunction<Scalar>*> ext_functions, Traverse::State* current_state,
            MatrixFormVol<Scalar>** current_mfvol, MatrixFormSurf<Scalar>** current_mfsurf, VectorFormVol<Scalar>** current_vfvol, VectorFormSurf<Scalar>** current_vfsurf);
 
       /// Adjusts order to refmaps.
@@ -182,15 +207,17 @@ namespace Hermes
       int calc_order_matrix_form(MatrixForm<Scalar>* mfv, RefMap** current_refmaps, Solution<Scalar>** current_u_ext, Traverse::State* current_state);
 
       /// Matrix forms - assemble the form.
-      virtual void assemble_matrix_form(MatrixForm<Scalar>* form, Func<double>** base_fns, Func<double>** test_fns, Func<Scalar>** u_ext, ExtData<Scalar>* ext,
-      AsmList<Scalar>* current_als_i, AsmList<Scalar>* current_als_j, int n_quadrature_points, Geom<double>* geometry, double* jacobian_x_weights);
+      virtual void assemble_matrix_form(MatrixForm<Scalar>* form, Func<Scalar>** u_ext, ExtData<Scalar>* ext,
+      AsmList<Scalar>* current_als_i, AsmList<Scalar>* current_als_j, Geom<double>* geometry, double* jacobian_x_weights,
+      Hermes::Hermes2D::ElementMode2D mode, double2x2* inv_ref_map);
 
       /// Vector forms - calculate the integration order.
       int calc_order_vector_form(VectorForm<Scalar>* mfv, RefMap** current_refmaps, Solution<Scalar>** current_u_ext, Traverse::State* current_state);
 
       /// Vector forms - assemble the form.
-      void assemble_vector_form(VectorForm<Scalar>* form, Func<double>** test_fns, Func<Scalar>** u_ext, ExtData<Scalar>* ext,
-      AsmList<Scalar>* current_als_i, int n_quadrature_points, Geom<double>* geometry, double* jacobian_x_weights);
+      void assemble_vector_form(VectorForm<Scalar>* form, Func<Scalar>** u_ext, ExtData<Scalar>* ext,
+      AsmList<Scalar>* current_als_i, Geom<double>* geometry, double* jacobian_x_weights,
+      Hermes::Hermes2D::ElementMode2D mode, double2x2* inv_ref_map);
 
       /// \ingroup Helper methods inside {calc_order_*, assemble_*}
       /// Init geometry, jacobian * weights, return the number of integration points.
@@ -213,6 +240,17 @@ namespace Hermes
 
       /// Matrix structure as well as spaces and weak formulation is up-to-date.
       bool is_up_to_date() const;
+
+      /// Integration order.
+      int integration_order;
+      /// Number of integration points.
+      int num_integration_points[2];
+      /// Number of integration points on edges.
+      int num_integration_points_surf[2][4];
+
+      /// Structure for precalculated basis / test functions.
+      Func<double>*** precalculated_shapesets[2];
+      Func<double>*** precalculated_shapesets_surf[2][4];
 
       /// Weak formulation.
       const WeakForm<Scalar>* wf;
@@ -276,20 +314,12 @@ namespace Hermes
       {
       public:
         CacheRecordPerSubIdx();
-        int order;
         int nvert;
         void clear();
-        int asmlistCnt;
-        Func<double>** fns;
-        Func<double>*** fnsSurface;
         Geom<double>* geometry;
         Geom<double>** geometrySurface;
         double* jacobian_x_weights;
         double** jacobian_x_weightsSurface;
-        int n_quadrature_points;
-        int* n_quadrature_pointsSurface;
-        int* orderSurface;
-        int* asmlistSurfaceCnt;
       };
 
       std::map<uint64_t, CacheRecordPerSubIdx*>*** cache_records_sub_idx;

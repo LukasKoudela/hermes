@@ -77,7 +77,7 @@ namespace Hermes
       }
 
     protected:
-      virtual Func<Scalar>* calculate(double* x_phys, double* y_phys, double* x_ref, double* y_ref, int np, double2x2* inv_ref_map) = 0;
+      virtual Func<Scalar>* calculate(double* x_phys, double* y_phys, double* x_ref, double* y_ref, int np) = 0;
 
       ElementMode2D mode;
       const Mesh* mesh;

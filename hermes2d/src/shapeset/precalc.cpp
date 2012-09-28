@@ -105,7 +105,7 @@ namespace Hermes
       Transformable::set_active_element(e);
     }
 
-    Func<double>* PrecalcShapeset::calculate(double3* xy, int np, double2x2* inv_ref_map) const
+    Func<double>* PrecalcShapeset::calculate(double3* xy, int np) const
     {
       Func<double>* u = new Func<double>(np, this->num_components);
       SpaceType space_type = this->get_space_type();
@@ -113,82 +113,48 @@ namespace Hermes
       if(space_type == HERMES_H1_SPACE || space_type == HERMES_L2_SPACE)
       {
         u->val = new double[np];
-        // helper array to calculate.
-        double* dx  = new double[np];
         u->dx  = new double[np];
-        // helper array to calculate.
-        double* dy  = new double[np];
         u->dy  = new double[np];
 
         for (int i = 0; i < np; i++, inv_ref_map++)
         {
           u->val[i] = shapeset->get_value(0, this->index, xy[i][0], xy[i][1], 0, element->get_mode());
-          dx[i] = shapeset->get_value(1, this->index, xy[i][0], xy[i][1], 0, element->get_mode());
-          dy[i] = shapeset->get_value(2, this->index, xy[i][0], xy[i][1], 0, element->get_mode());
-          u->dx[i] = (dx[i] * (*inv_ref_map)[0][0] + dy[i] * (*inv_ref_map)[0][1]);
-          u->dy[i] = (dx[i] * (*inv_ref_map)[1][0] + dy[i] * (*inv_ref_map)[1][1]);
+          u->dx[i] = shapeset->get_value(1, this->index, xy[i][0], xy[i][1], 0, element->get_mode());
+          u->dy[i] = shapeset->get_value(2, this->index, xy[i][0], xy[i][1], 0, element->get_mode());
         }
-        
-        delete [] dx;
-        delete [] dy;
       }
       else if(space_type == HERMES_HCURL_SPACE)
       {
         u->val0 = new double[np];
         u->val1 = new double[np];
+        u->dx1 = new double[np];
+        u->dy0 = new double[np];
         u->curl = new double[np];
-
-        // helper arrays to calculate.
-        double* fn0  = new double[np];
-        double* fn1  = new double[np];
-        double* dx1  = new double[np];
-        double* dy0  = new double[np];
 
         for (int i = 0; i < np; i++, inv_ref_map++)
         {
-          fn0[i] = shapeset->get_value(0, this->index, xy[i][0], xy[i][1], 0, element->get_mode());
-          fn1[i] = shapeset->get_value(0, this->index, xy[i][0], xy[i][1], 1, element->get_mode());
-          dx1[i] = shapeset->get_value(1, this->index, xy[i][0], xy[i][1], 1, element->get_mode());
-          dy0[i] = shapeset->get_value(2, this->index, xy[i][0], xy[i][1], 0, element->get_mode());
-
-          u->val0[i] = (fn0[i] * (*inv_ref_map)[0][0] + fn1[i] * (*inv_ref_map)[0][1]);
-          u->val1[i] = (fn0[i] * (*inv_ref_map)[1][0] + fn1[i] * (*inv_ref_map)[1][1]);
-          u->curl[i] = ((*inv_ref_map)[0][0] * (*inv_ref_map)[1][1] - (*inv_ref_map)[1][0] * (*inv_ref_map)[0][1]) * (dx1[i] - dy0[i]);
+          u->val0[i] = shapeset->get_value(0, this->index, xy[i][0], xy[i][1], 0, element->get_mode());
+          u->val1[i] = shapeset->get_value(0, this->index, xy[i][0], xy[i][1], 1, element->get_mode());
+          u->dx1[i] = shapeset->get_value(1, this->index, xy[i][0], xy[i][1], 1, element->get_mode());
+          u->dy0[i] = shapeset->get_value(2, this->index, xy[i][0], xy[i][1], 0, element->get_mode());
         }
-
-        delete [] fn0;
-        delete [] fn1;
-        delete [] dx1;
-        delete [] dy0;
       }
       // Hdiv space.
       else if(space_type == HERMES_HDIV_SPACE)
       {
         u->val0 = new double[np];
         u->val1 = new double[np];
+        u->dx0 = new double[np];
+        u->dy1 = new double[np];
         u->div = new double[np];
-
-        double *fn0 = new double[np];
-        double *fn1 = new double[np];
-        double *dx0 = new double[np];
-        double *dy1 = new double[np];
 
         for (int i = 0; i < np; i++, inv_ref_map++)
         {
-          fn0[i] = shapeset->get_value(0, this->index, xy[i][0], xy[i][1], 0, element->get_mode());
-          fn1[i] = shapeset->get_value(0, this->index, xy[i][0], xy[i][1], 1, element->get_mode());
-          dx0[i] = shapeset->get_value(1, this->index, xy[i][0], xy[i][1], 0, element->get_mode());
-          dy1[i] = shapeset->get_value(2, this->index, xy[i][0], xy[i][1], 1, element->get_mode());
-
-          u->val0[i] = (  fn0[i] * (*inv_ref_map)[1][1] - fn1[i] * (*inv_ref_map)[1][0]);
-          u->val1[i] = (- fn0[i] * (*inv_ref_map)[0][1] + fn1[i] * (*inv_ref_map)[0][0]);
-          u->div[i] = ((*inv_ref_map)[0][0] * (*inv_ref_map)[1][1] - (*inv_ref_map)[1][0] * (*inv_ref_map)[0][1]) * (dx0[i] + dy1[i]);
+          u->val0[i] = shapeset->get_value(0, this->index, xy[i][0], xy[i][1], 0, element->get_mode());
+          u->val1[i] = shapeset->get_value(0, this->index, xy[i][0], xy[i][1], 1, element->get_mode());
+          u->dx0[i] = shapeset->get_value(1, this->index, xy[i][0], xy[i][1], 0, element->get_mode());
+          u->dy1[i] = shapeset->get_value(2, this->index, xy[i][0], xy[i][1], 1, element->get_mode());
         }
-
-        delete [] fn0;
-        delete [] fn1;
-        delete [] dx0;
-        delete [] dy1;
       }
 
       inv_ref_map -= np;

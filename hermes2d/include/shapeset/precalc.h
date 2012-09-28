@@ -113,7 +113,7 @@ namespace Hermes
       bool is_slave() const;
 
       virtual void precalculate(int order, int mask);
-      Func<double>* calculate(double3* xy, int np, double2x2* inv_ref_map) const;
+      Func<double>* calculate(double3* xy, int np) const;
 
       void update_max_index();
 

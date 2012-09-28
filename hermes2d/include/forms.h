@@ -87,6 +87,8 @@ namespace Hermes
 
       int get_num_gip() const;
 
+      Func<T>* transform(double2x2* inv_ref_map);
+
     protected:
       const int num_gip; ///< Number of integration points used by this intance.
       const int nc;      ///< Number of components. Currently accepted values are 1 (H1, L2 space) and 2 (Hcurl, Hdiv space).

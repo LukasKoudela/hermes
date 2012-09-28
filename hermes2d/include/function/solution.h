@@ -167,7 +167,7 @@ namespace Hermes
 
       static void set_static_verbose_output(bool verbose);
     protected:
-      virtual Func<Scalar>* calculate(double* x_phys, double* y_phys, double* x_ref, double* y_ref, int np, double2x2* inv_ref_map);
+      virtual Func<Scalar>* calculate(double* x_phys, double* y_phys, double* x_ref, double* y_ref, int np);
 
       static bool static_verbose_output;
 
