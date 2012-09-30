@@ -43,9 +43,6 @@ namespace Hermes
     static const std::string H2D_DG_INNER_EDGE = "-1234567";
 
     template<typename Scalar>
-    double DiscreteProblem<Scalar>::fake_wt = 1.0;
-
-    template<typename Scalar>
     DiscreteProblem<Scalar>::DiscreteProblem(const WeakForm<Scalar>* wf, Hermes::vector<const Space<Scalar> *> spaces) : Hermes::Solvers::DiscreteProblemInterface<Scalar>(), wf(wf), wf_seq(-1)
     {
       if(spaces.empty())
@@ -76,7 +73,6 @@ namespace Hermes
       // Set all attributes for which we don't need to acces wf or spaces.
       // This is important for the destructor to properly detect what needs to be deallocated.
       sp_seq = NULL;
-      is_fvm = false;
       RungeKutta = false;
       RK_original_spaces_count = 0;
       have_matrix = false;
@@ -255,12 +251,6 @@ namespace Hermes
         up_to_date = false;
 
       return up_to_date;
-    }
-
-    template<typename Scalar>
-    void DiscreteProblem<Scalar>::set_fvm()
-    {
-      this->is_fvm = true;
     }
 
     template<typename Scalar>
@@ -784,201 +774,7 @@ namespace Hermes
       assemble(NULL, NULL, rhs, force_diagonal_blocks, block_weights);
     }
 
-    template<typename Scalar>
-    void DiscreteProblem<Scalar>::init_assembling(Scalar* coeff_vec, Solution<Scalar>*** u_ext, AsmList<Scalar>*** als, Hermes::vector<MeshFunction<Scalar>*>& ext_functions, MeshFunction<Scalar>*** ext,
-      Hermes::vector<MatrixFormVol<Scalar>*>* mfvol, Hermes::vector<MatrixFormSurf<Scalar>*>* mfsurf, Hermes::vector<MatrixFormDG<Scalar>*>* mfDG, Hermes::vector<VectorFormVol<Scalar>*>* vfvol, Hermes::vector<VectorFormSurf<Scalar>*>* vfsurf, Hermes::vector<VectorFormDG<Scalar>*>* vfDG)
-    {
-      for(unsigned int i = 0; i < Hermes2DApi.get_param_value(Hermes::Hermes2D::numThreads); i++)
-      {
-        if(coeff_vec != NULL)
-        {
-          u_ext[i] = new Solution<Scalar>*[wf->get_neq()];
-          if(i == 0)
-          {
-            int first_dof = 0;
-            for (int j = 0; j < wf->get_neq(); j++)
-            {
-              u_ext[i][j] = new Solution<Scalar>(spaces[j]->get_mesh());
-              Solution<Scalar>::vector_to_solution(coeff_vec, spaces[j], u_ext[i][j], !RungeKutta, first_dof);
-              first_dof += spaces[j]->get_num_dofs();
-              u_ext[i][j]->set_quad_2d(&g_quad_2d_std);
-            }
-          }
-          else
-          {
-            for (int j = 0; j < wf->get_neq(); j++)
-            {
-              u_ext[i][j] = new Solution<Scalar>(spaces[j]->get_mesh());
-              u_ext[i][j]->copy(u_ext[0][j]);
-              u_ext[i][j]->set_quad_2d(&g_quad_2d_std);
-            }
-          }
-        }
-        else
-        {
-          u_ext[i] = new Solution<Scalar>*[wf->get_neq()];
-          for (int j = 0; j < wf->get_neq(); j++)
-          {
-            if(spaces[j]->get_shapeset()->get_num_components() == 1)
-              u_ext[i][j] = new ZeroSolution<Scalar>(spaces[j]->get_mesh());
-            else
-              u_ext[i][j] = new ZeroSolutionVector<Scalar>(spaces[j]->get_mesh());
-            u_ext[i][j]->set_quad_2d(&g_quad_2d_std);
-          }
-        }
-      }
-      for(unsigned int i = 0; i < Hermes2DApi.get_param_value(Hermes::Hermes2D::numThreads); i++)
-      {
-        als[i] = new AsmList<Scalar>*[wf->get_neq()];
-        for (unsigned int j = 0; j < wf->get_neq(); j++)
-          als[i][j] = new AsmList<Scalar>();
-      }
-      for(unsigned int i = 0; i < Hermes2DApi.get_param_value(Hermes::Hermes2D::numThreads); i++)
-      {
-        ext[i] = new MeshFunction<Scalar>*[ext_functions.size()];
-        for (int j = 0; j < ext_functions.size(); j++)
-        {
-          ext[i][j] = ext_functions[j]->clone();
-          ext[i][j]->set_quad_2d(&g_quad_2d_std);
-        }
-      }
-      for(unsigned int i = 0; i < Hermes2DApi.get_param_value(Hermes::Hermes2D::numThreads); i++)
-      {
-        for (int j = 0; j < wf->mfvol.size(); j++)
-        {
-          mfvol[i].push_back(wf->mfvol[j]->clone());
-          // Inserting proper ext.
-          for(int k = 0; k < wf->mfvol[j]->ext.size(); k++)
-          {
-            for (int l = 0; l < ext_functions.size(); l++)
-            {
-              if(ext_functions[l] == wf->mfvol[j]->ext[k])
-              {
-                while(k >= mfvol[i][j]->ext.size())
-                  mfvol[i][j]->ext.push_back(NULL);
-                mfvol[i][j]->ext[k] = ext[i][l];
-                break;
-              }
-            }
-          }
-        }
-      }
-      for(unsigned int i = 0; i < Hermes2DApi.get_param_value(Hermes::Hermes2D::numThreads); i++)
-      {
-        for (int j = 0; j < wf->mfsurf.size(); j++)
-        {
-          mfsurf[i].push_back(wf->mfsurf[j]->clone());
-          // Inserting proper ext.
-          for(int k = 0; k < wf->mfsurf[j]->ext.size(); k++)
-          {
-            for (int l = 0; l < ext_functions.size(); l++)
-            {
-              if(ext_functions[l] == wf->mfsurf[j]->ext[k])
-              {
-                while(k >= mfsurf[i][j]->ext.size())
-                  mfsurf[i][j]->ext.push_back(NULL);
-                mfsurf[i][j]->ext[k] = ext[i][l];
-                break;
-              }
-            }
-          }
-        }
-      }
-      for(unsigned int i = 0; i < Hermes2DApi.get_param_value(Hermes::Hermes2D::numThreads); i++)
-      {
-        for (int j = 0; j < wf->mfDG.size(); j++)
-        {
-          mfDG[i].push_back(wf->mfDG[j]->clone());
-          // Inserting proper ext.
-          for(int k = 0; k < wf->mfDG[j]->ext.size(); k++)
-          {
-            for (int l = 0; l < ext_functions.size(); l++)
-            {
-              if(ext_functions[l] == wf->mfDG[j]->ext[k])
-              {
-                while(k >= mfDG[i][j]->ext.size())
-                  mfDG[i][j]->ext.push_back(NULL);
-                mfDG[i][j]->ext[k] = ext[i][l];
-                break;
-              }
-            }
-          }
-        }
-      }
-      for(unsigned int i = 0; i < Hermes2DApi.get_param_value(Hermes::Hermes2D::numThreads); i++)
-      {
-        for (int j = 0; j < wf->vfvol.size(); j++)
-        {
-          vfvol[i].push_back(wf->vfvol[j]->clone());
-          // Inserting proper ext.
-          for(int k = 0; k < wf->vfvol[j]->ext.size(); k++)
-          {
-            for (int l = 0; l < ext_functions.size(); l++)
-            {
-              if(ext_functions[l] == wf->vfvol[j]->ext[k])
-              {
-                while(k >= vfvol[i][j]->ext.size())
-                  vfvol[i][j]->ext.push_back(NULL);
-
-                vfvol[i][j]->ext[k] = ext[i][l];
-                break;
-              }
-            }
-          }
-        }
-      }
-      for(unsigned int i = 0; i < Hermes2DApi.get_param_value(Hermes::Hermes2D::numThreads); i++)
-      {
-        for (int j = 0; j < wf->vfsurf.size(); j++)
-        {
-          vfsurf[i].push_back(wf->vfsurf[j]->clone());
-          // Inserting proper ext.
-          for(int k = 0; k < wf->vfsurf[j]->ext.size(); k++)
-          {
-            for (int l = 0; l < ext_functions.size(); l++)
-            {
-              if(ext_functions[l] == wf->vfsurf[j]->ext[k])
-              {
-                while(k >= vfsurf[i][j]->ext.size())
-                  vfsurf[i][j]->ext.push_back(NULL);
-                vfsurf[i][j]->ext[k] = ext[i][l];
-                break;
-              }
-            }
-          }
-        }
-      }
-      for(unsigned int i = 0; i < Hermes2DApi.get_param_value(Hermes::Hermes2D::numThreads); i++)
-      {
-        for (int j = 0; j < wf->vfDG.size(); j++)
-        {
-          vfDG[i].push_back(wf->vfDG[j]->clone());
-          // Inserting proper ext.
-          for(int k = 0; k < wf->vfDG[j]->ext.size(); k++)
-          {
-            for (int l = 0; l < ext_functions.size(); l++)
-            {
-              if(ext_functions[l] == wf->vfDG[j]->ext[k])
-              {
-                while(k >= vfDG[i][j]->ext.size())
-                  vfDG[i][j]->ext.push_back(NULL);
-                vfDG[i][j]->ext[k] = ext[i][l];
-                break;
-              }
-            }
-          }
-        }
-      }
-
-      assert(cache_element_stored == NULL);
-      cache_element_stored = new bool*[this->spaces.size()];
-      for(unsigned int i = 0; i < this->spaces.size(); i++)
-      {
-        cache_element_stored[i] = new bool[this->spaces[i]->get_mesh()->get_max_element_id()];
-        memset(cache_element_stored[i], 0, sizeof(bool) * this->spaces[i]->get_mesh()->get_max_element_id());
-      }
-    }
-
+    /*
     template<typename Scalar>
     void DiscreteProblem<Scalar>::deinit_assembling(Solution<Scalar>*** u_ext, AsmList<Scalar>*** als, Hermes::vector<MeshFunction<Scalar>*>& ext_functions, MeshFunction<Scalar>*** ext,
       Hermes::vector<MatrixFormVol<Scalar>*>* mfvol, Hermes::vector<MatrixFormSurf<Scalar>*>* mfsurf, Hermes::vector<MatrixFormDG<Scalar>*>* mfDG, 
@@ -1059,7 +855,7 @@ namespace Hermes
       delete [] cache_element_stored;
       cache_element_stored = NULL;
     }
-
+    */
     template<typename Scalar>
     void DiscreteProblem<Scalar>::assemble_init_integration_order()
     {
@@ -1482,6 +1278,22 @@ namespace Hermes
     template<typename Scalar>
     void DiscreteProblem<Scalar>::assemble_calculate_precalculated_shapesets(Hermes::vector<const Mesh*> meshes)
     {
+      precalculated_shapesets[0] = new PrecalcShapeset*[this->spaces.size()];
+      precalculated_shapesets[1] = new PrecalcShapeset*[this->spaces.size()];
+      for(int mode_i = 0; mode_i < 2; mode_i++)
+        for(int edge_i = 0; edge_i < 4; edge_i++)
+          precalculated_shapesets_surf[mode_i][edge_i] = PrecalcShapeset*[this->spaces.size()];
+
+      for(int space_i = 0; space_i < this->spaces.size(); space_i++)
+      {
+        for(int mode_i = 0; mode_i < 2; mode_i++)
+        {
+          precalculated_shapesets[mode_i][space_i] = new PrecalcShapeset(this->spaces[space_i]->get_shapeset());
+          for(int edge_i = 0; edge_i < 4; edge_i++)
+            precalculated_shapesets[mode_i][edge_i] = new PrecalcShapeset(this->spaces[space_i]->get_shapeset());
+        }
+      }
+
       Traverse trav_master(true);
       unsigned int num_states = trav_master.get_num_states(meshes);
       trav_master.begin(meshes.size(), &(meshes.front()));
@@ -1493,14 +1305,8 @@ namespace Hermes
         trav[i].stack = trav_master.stack;
       }
 
+#define CHUNKSIZE 1
       int state_i;
-
-      // indices structures.
-      std::set<int>* indices[2];
-      indices[0] = new std::set<int>[this->spaces.size()];
-      indices[1] = new std::set<int>[this->spaces.size()];
-
-      #define CHUNKSIZE 1
       int num_threads_used = Hermes2DApi.get_param_value(Hermes::Hermes2D::numThreads);
 #pragma omp parallel shared(trav_master, indices) num_threads(num_threads_used)
       {
@@ -1508,26 +1314,26 @@ namespace Hermes
         for(state_i = 0; state_i < num_states; state_i++)
         {
           Traverse::State current_state;
-  #pragma omp critical (get_next_state)
+#pragma omp critical (get_next_state)
           current_state = trav[omp_get_thread_num()].get_next_state(&trav_master.top, &trav_master.id);
-          if(current_state.rep->is_triangle())
+          int mode = current_state.rep->get_mode();
+
+          for(int space_i = 0; space_i < this->spaces.size(); space_i++)
           {
-            for(unsigned int i = 0; i < this->spaces.size(); i++)
+            AsmList<Scalar> al;
+            this->spaces[i]->get_element_assembly_list(current_state.e[space_i], &al);
+
+            if(current_state.sub_idx[space_i] == 0)
             {
-              AsmList<Scalar> al;
-              this->spaces[i]->get_element_assembly_list(current_state.e[i], &al);
-              for(unsigned int j = 0; j < al.cnt; j++)
-                indices[0][i].insert(al.idx[j]);
+              for(unsigned int index_i = 0; index_i < al.cnt; index_i++)
+              if(this->precalculated_shapesets[mode][space_i]->zero_sub_idx_table[index_i] == NULL)
+                this->precalculated_shapesets[mode][space_i]->calculate(0, g_quad_2d_std.get_points(mode), g_quad_2d_std.get_num_points(this->integration_order, mode), al.idx[index_i]);
             }
-          }
-          else
-          {
-            for(unsigned int i = 0; i < this->spaces.size(); i++)
+            else
             {
-              AsmList<Scalar> al;
-              this->spaces[i]->get_element_assembly_list(current_state.e[i], &al);
-              for(unsigned int j = 0; j < al.cnt; j++)
-                indices[0][i].insert(al.idx[j]);
+              for(unsigned int index_i = 0; index_i < al.cnt; index_i++)
+              if(this->precalculated_shapesets[mode][space_i]->sub_idx_tables.find(current_state.sub_idx[space_i]) == this->precalculated_shapesets[mode][space_i]->sub_idx_tables.end())
+                this->precalculated_shapesets[mode][space_i]->calculate(current_state.sub_idx[space_i], g_quad_2d_std.get_points(mode), g_quad_2d_std.get_num_points(this->integration_order, mode), al.idx[index_i]);
             }
           }
         }
@@ -1536,66 +1342,6 @@ namespace Hermes
       trav_master.finish();
       for(unsigned int i = 0; i < Hermes2DApi.get_param_value(Hermes::Hermes2D::numThreads); i++)
         trav[i].finish();
-
-      delete [] trav;
-
-      // shapeset structure.
-      precalculated_shapesets[HERMES_MODE_TRIANGLE] = new Func<double>**[this->spaces.size()];
-      for(int i = 0; i < 3; i++)
-        precalculated_shapesets_surf[HERMES_MODE_TRIANGLE][i] = new Func<double>**[this->spaces.size()];
-      precalculated_shapesets[HERMES_MODE_QUAD] = new Func<double>**[this->spaces.size()];
-      for(int i = 0; i < 4; i++)
-        precalculated_shapesets_surf[HERMES_MODE_QUAD][i] = new Func<double>**[this->spaces.size()];
-
-      for(unsigned int space_i = 0; space_i < this->spaces.size(); space_i++)
-      {
-        // initialize PrecalcShapeset.
-        PrecalcShapeset pss(this->spaces[space_i]->get_shapeset());
-
-        // triangles.
-        precalculated_shapesets[HERMES_MODE_TRIANGLE][space_i] = new Func<double>*[this->spaces[space_i]->get_shapeset()->get_max_index(HERMES_MODE_TRIANGLE)];
-        // get bundled points.
-        double3* pts = g_quad_2d_std.get_points(this->integration_order, HERMES_MODE_TRIANGLE);
-                int index_i = 0;
-        // per index.
-        for(std::set<int>::iterator it = indices[HERMES_MODE_TRIANGLE][space_i].begin(); it != indices[HERMES_MODE_TRIANGLE][space_i].end(); it++)
-        {
-          pss.set_shape_index(*it);
-          precalculated_shapesets[HERMES_MODE_TRIANGLE][space_i][index_i] = pss.calculate(pts, this->num_integration_points[HERMES_MODE_TRIANGLE]);
-
-          // per index, per surface.
-          for(int surf_i = 0; surf_i < 3; surf_i++)
-          {
-            int orderSurf = g_quad_2d_std.get_edge_points(surf_i, this->integration_order, HERMES_MODE_TRIANGLE);
-            double3* ptsSurf = g_quad_2d_std.get_points(orderSurf, HERMES_MODE_TRIANGLE);
-            precalculated_shapesets_surf[HERMES_MODE_TRIANGLE][surf_i][space_i][index_i] = pss.calculate(pts, this->num_integration_points_surf[HERMES_MODE_TRIANGLE][surf_i]);
-          }
-          index_i++;
-        }
-
-        // quads.
-        precalculated_shapesets[HERMES_MODE_QUAD][space_i] = new Func<double>*[this->spaces[space_i]->get_shapeset()->get_max_index(HERMES_MODE_QUAD)];
-        pts = g_quad_2d_std.get_points(this->integration_order, HERMES_MODE_QUAD);
-        index_i = 0;
-        // per index.
-        for(std::set<int>::iterator it = indices[HERMES_MODE_QUAD][space_i].begin(); it != indices[HERMES_MODE_QUAD][space_i].end(); it++)
-        {
-          pss.set_shape_index(*it);
-          precalculated_shapesets[HERMES_MODE_QUAD][space_i][index_i] = pss.calculate(pts, this->num_integration_points[HERMES_MODE_QUAD]);
-
-          for(int surf_i = 0; surf_i < 4; surf_i++)
-          {
-            int orderSurf = g_quad_2d_std.get_edge_points(surf_i, this->integration_order, HERMES_MODE_QUAD);
-            double3* ptsSurf = g_quad_2d_std.get_points(orderSurf, HERMES_MODE_QUAD);
-            precalculated_shapesets_surf[HERMES_MODE_QUAD][surf_i][space_i][index_i] = pss.calculate(pts, this->num_integration_points_surf[HERMES_MODE_QUAD][surf_i]);
-          }
-          index_i++;
-        }
-      }
-
-      delete [] indices[0];
-      delete [] indices[1];
-      delete [] indices;
     }
 
     template<typename Scalar>
@@ -1604,34 +1350,12 @@ namespace Hermes
       bool force_diagonal_blocks,
       Table* block_weights)
     {
-      // Initial check of meshes and spaces.
-      for(unsigned int space_i = 0; space_i < this->spaces.size(); space_i++)
-      {
-        if(!this->spaces[space_i]->isOkay())
-          throw Hermes::Exceptions::Exception("Space %d is not okay in assemble().", space_i);
-
-        if(!this->spaces[space_i]->get_mesh()->isOkay())
-          throw Hermes::Exceptions::Exception("Mesh %d is not okay in assemble().", space_i);
-      }
-
-      this->tick();
-
-      // Important, sets the current caughtException to NULL.
-      this->caughtException = NULL;
-
-      current_mat = mat;
-      current_rhs = rhs;
-      current_force_diagonal_blocks = force_diagonal_blocks;
-      current_block_weights = block_weights;
-
-      // Check that the block scaling table have proper dimension.
-      if(block_weights != NULL)
-        if(block_weights->get_size() != wf->get_neq())
-          throw Exceptions::LengthException(6, block_weights->get_size(), wf->get_neq());
-
+      // Check.
+      this->assemble_check();
+      
       // Creating matrix sparse structure.
       create_sparse_structure();
-
+      
       // All meshes that make sense here - spaces, ext functions' meshes.
       Hermes::vector<const Mesh*> meshes;
       for(unsigned int space_i = 0; space_i < spaces.size(); space_i++)
@@ -1639,10 +1363,12 @@ namespace Hermes
 
       // We need to clone all the Ext functions, because they are controlled by the user.
       std::set<MeshFunction<Scalar>*> ext_functions;
-
-      // Structures that cloning will be done into.
-      Solution<Scalar>*** u_ext = new Solution<Scalar>**[Hermes2DApi.get_param_value(Hermes::Hermes2D::numThreads)];
-      AsmList<Scalar>*** als = new AsmList<Scalar>**[Hermes2DApi.get_param_value(Hermes::Hermes2D::numThreads)];
+      
+      // Initializes ext_functions, potentially adds to meshes.
+      this->assemble_init_functions(ext_functions, meshes);
+      
+      // Init integration order, u_ext, ...
+      Solution<Scalar>** u_ext;
       MeshFunction<Scalar>*** ext = new MeshFunction<Scalar>**[Hermes2DApi.get_param_value(Hermes::Hermes2D::numThreads)];
       Hermes::vector<MatrixFormVol<Scalar>*>* mfvol = new Hermes::vector<MatrixFormVol<Scalar>*>[Hermes2DApi.get_param_value(Hermes::Hermes2D::numThreads)];
       Hermes::vector<MatrixFormSurf<Scalar>*>* mfsurf = new Hermes::vector<MatrixFormSurf<Scalar>*>[Hermes2DApi.get_param_value(Hermes::Hermes2D::numThreads)];
@@ -1650,28 +1376,25 @@ namespace Hermes
       Hermes::vector<VectorFormVol<Scalar>*>* vfvol = new Hermes::vector<VectorFormVol<Scalar>*>[Hermes2DApi.get_param_value(Hermes::Hermes2D::numThreads)];
       Hermes::vector<VectorFormSurf<Scalar>*>* vfsurf = new Hermes::vector<VectorFormSurf<Scalar>*>[Hermes2DApi.get_param_value(Hermes::Hermes2D::numThreads)];
       Hermes::vector<VectorFormDG<Scalar>*>* vfDG = new Hermes::vector<VectorFormDG<Scalar>*>[Hermes2DApi.get_param_value(Hermes::Hermes2D::numThreads)];
+      this->assemble_init(mat, rhs, force_diagonal_blocks, block_weights, coeff_vec, u_ext, ext_functions, ext, mfvol, mfsurf, mfDG, vfvol, vfsurf, vfDG);
+      
+      // Precalculate shapesets.
+      this->assemble_calculate_precalculated_shapesets(meshes);
 
-      // Fill these structures.
-      //init_assembling(coeff_vec, u_ext, als, ext_functions, ext, mfvol, mfsurf, mfDG, vfvol, vfsurf, vfDG);
-
+      // Traverse master - for shared stack.
       Traverse trav_master(true);
       unsigned int num_states = trav_master.get_num_states(meshes);
-
       trav_master.begin(meshes.size(), &(meshes.front()));
 
+      // Traverse slaves - for distribution to threads.
       Traverse* trav = new Traverse[Hermes2DApi.get_param_value(Hermes::Hermes2D::numThreads)];
-      Hermes::vector<Transformable *>* fns = new Hermes::vector<Transformable *>[Hermes2DApi.get_param_value(Hermes::Hermes2D::numThreads)];
       for(unsigned int i = 0; i < Hermes2DApi.get_param_value(Hermes::Hermes2D::numThreads); i++)
       {
         trav[i].begin(meshes.size(), &(meshes.front()), NULL);
         trav[i].stack = trav_master.stack;
       }
 
-      int state_i;
-
-      Solution<Scalar>** current_u_ext;
-      AsmList<Scalar>** current_als;
-
+      // Clone forms.
       MatrixFormVol<Scalar>** current_mfvol;
       MatrixFormSurf<Scalar>** current_mfsurf;
       MatrixFormDG<Scalar>** current_mfDG = NULL;
@@ -1681,7 +1404,8 @@ namespace Hermes
 
 #define CHUNKSIZE 1
       int num_threads_used = Hermes2DApi.get_param_value(Hermes::Hermes2D::numThreads);
-#pragma omp parallel shared(trav_master, mat, rhs ) private(state_i, current_u_ext, current_als, current_mfvol, current_mfsurf, current_mfDG, current_vfvol, current_vfsurf, current_vfDG) num_threads(num_threads_used)
+      int state_i;
+#pragma omp parallel shared(trav_master, mat, rhs) private(state_i, current_mfvol, current_mfsurf, current_mfDG, current_vfvol, current_vfsurf, current_vfDG) num_threads(num_threads_used)
       {
 #pragma omp for schedule(dynamic, CHUNKSIZE)
         for(state_i = 0; state_i < num_states; state_i++)
@@ -1691,9 +1415,6 @@ namespace Hermes
             Traverse::State current_state;
   #pragma omp critical (get_next_state)
             current_state = trav[omp_get_thread_num()].get_next_state(&trav_master.top, &trav_master.id);
-
-            current_u_ext = u_ext[omp_get_thread_num()];
-            current_als = als[omp_get_thread_num()];
 
             current_mfvol = mfvol[omp_get_thread_num()].size() == 0 ? NULL : &(mfvol[omp_get_thread_num()].front());
             current_mfsurf = mfsurf[omp_get_thread_num()].size() == 0 ? NULL : &(mfsurf[omp_get_thread_num()].front());
@@ -1765,82 +1486,14 @@ namespace Hermes
     }
 
     template<typename Scalar>
-    void DiscreteProblem<Scalar>::init_state(PrecalcShapeset** current_pss, PrecalcShapeset** current_spss, RefMap** current_refmaps, Solution<Scalar>** current_u_ext, AsmList<Scalar>** current_als, Traverse::State* current_state)
-    {
-      // Obtain assembly lists for the element at all spaces of the stage, set appropriate mode for each pss.
-      // NOTE: Active elements and transformations for external functions (including the solutions from previous
-      // Newton's iteration) as well as basis functions (master PrecalcShapesets) have already been set in
-      // trav.get_next_state(...).
-      for (unsigned int i = 0; i < spaces.size(); i++)
-      {
-        if(current_state->e[i] == NULL)
-          continue;
-
-        // \todo do not obtain again if the element was not changed.
-        spaces[i]->get_element_assembly_list(current_state->e[i], current_als[i], spaces_first_dofs[i]);
-
-        // Set active element to all test functions.
-        current_spss[i]->set_active_element(current_state->e[i]);
-        current_spss[i]->set_master_transform();
-
-        // Set active element to reference mappings.
-        current_refmaps[i]->set_active_element(current_state->e[i]);
-        current_refmaps[i]->force_transform(current_pss[i]->get_transform(), current_pss[i]->get_ctm());
-      }
-      return;
-    }
-
-    template<typename Scalar>
-    void DiscreteProblem<Scalar>::init_surface_state(AsmList<Scalar>** current_als, Traverse::State* current_state)
-    {
-      // Obtain the list of shape functions which are nonzero on this surface.
-      for (unsigned int i = 0; i < spaces.size(); i++)
-      {
-        if(current_state->e[i] == NULL)
-          continue;
-
-        spaces[i]->get_boundary_assembly_list(current_state->e[i], current_state->isurf, current_als[i], spaces_first_dofs[i]);
-      }
-    }
-
-    template<typename Scalar>
-    DiscreteProblem<Scalar>::CacheRecordPerSubIdx::CacheRecordPerSubIdx() : fnsSurface(NULL)
-    {
-    }
-
-    template<typename Scalar>
-    void DiscreteProblem<Scalar>::CacheRecordPerSubIdx::clear()
-    {
-      delete [] this->jacobian_x_weights;
-      this->geometry->free();
-      delete this->geometry;
-
-      for(unsigned int edge_i = 0; edge_i < nvert; edge_i++)
-      {
-        delete [] this->jacobian_x_weightsSurface[edge_i];
-        this->geometrySurface[edge_i]->free();
-        delete this->geometrySurface[edge_i];
-      }
-
-      delete [] this->geometrySurface;
-      delete [] this->jacobian_x_weightsSurface;
-    }
-
-    template<typename Scalar>
-    void DiscreteProblem<Scalar>::CacheRecordPerElement::clear()
-    {
-      delete [] this->asmlistIdx;
-    }
-
-    template<typename Scalar>
-    bool DiscreteProblem<Scalar>::state_boundary_info(Traverse::State* current_state, bool* isNaturalBndCondition, MatrixFormSurf<Scalar>** current_mfsurf, VectorFormSurf<Scalar>** current_vfsurf)
+    bool DiscreteProblem<Scalar>::one_state_boundary_info(Traverse::State* current_state, bool* is_natural_bnd_condition, MatrixFormSurf<Scalar>** current_mfsurf, VectorFormSurf<Scalar>** current_vfsurf)
     {
       if(current_state->isBnd)
       {
         current_state->isBnd = false;
         for (current_state->isurf = 0; current_state->isurf < current_state->rep->nvert; current_state->isurf++)
         {
-          isNaturalBndCondition[current_state->isurf] = false;
+          is_natural_bnd_condition[current_state->isurf] = false;
           if(!current_state->bnd[current_state->isurf])
             continue;
           for(int current_mfsurf_i = 0; current_mfsurf_i < wf->mfsurf.size(); current_mfsurf_i++)
@@ -1848,7 +1501,7 @@ namespace Hermes
             MatrixFormSurf<Scalar>* form = current_mfsurf[current_mfsurf_i];
             if(form_to_be_assembled(form, current_state))
             {
-              isNaturalBndCondition[current_state->isurf] = true;
+              is_natural_bnd_condition[current_state->isurf] = true;
               current_state->isBnd = true;
               break;
             }
@@ -1858,7 +1511,7 @@ namespace Hermes
             VectorFormSurf<Scalar>* form = current_vfsurf[current_vfsurf_i];
             if(form_to_be_assembled(form, current_state))
             {
-              isNaturalBndCondition[current_state->isurf] = true;
+              is_natural_bnd_condition[current_state->isurf] = true;
               current_state->isBnd = true;
               break;
             }
@@ -1869,35 +1522,57 @@ namespace Hermes
     }
 
     template<typename Scalar>
-    bool DiscreteProblem<Scalar>::element_changed(Traverse::State* current_state, AsmList<Scalar>** current_als)
+    void DiscreteProblem<Scalar>::one_state_get_assembly_lists(Traverse::State* current_state, AsmList<Scalar>** assembly_lists, AsmList<Scalar>*** assembly_lists_surf, bool* is_natural_bnd_condition)
+    {
+      for(unsigned int space_i = 0; space_i < this->spaces.size(); space_i++)
+        this->spaces[space_i]->get_element_assembly_lists(current_state->e[space_i], assembly_lists[space_i]);
+      
+      if(current_state->isBnd)
+      {
+        assembly_lists_surf = new AsmList<Scalar>*[this->spaces.size()];
+        for(unsigned int space_i = 0; space_i < this->spaces.size(); space_i++)
+        {
+          assembly_lists_surf[space_i] = new AsmList<Scalar>*[current_state->rep->nvert];
+          for (current_state->isurf = 0; current_state->isurf < current_state->rep->nvert; current_state->isurf++)
+          {
+            if(!is_natural_bnd_condition[current_state->isurf])
+              continue;
+            this->spaces[space_i]->get_boundary_assembly_list(current_state->e[space_i], current_state->isurf, assembly_lists_surf[space_i][current_state->isurf], this->spaces_first_dofs[space_i]);
+          }
+        }
+      }
+    }
+
+    template<typename Scalar>
+    bool DiscreteProblem<Scalar>::one_state_element_changed(Traverse::State* current_state, AsmList<Scalar>** current_als)
     {
       bool changedInLastAdaptation = false;
-      for(unsigned int spaces_i = 0; spaces_i < this->spaces.size(); spaces_i++)
+      for(unsigned int space_i = 0; space_i < this->spaces.size(); space_i++)
       {
-        if(current_state->e[spaces_i] != NULL)
-          if(this->spaces[spaces_i]->edata[current_state->e[spaces_i]->id].changed_in_last_adaptation)
+        if(current_state->e[space_i] != NULL)
+          if(this->spaces[space_i]->edata[current_state->e[space_i]->id].changed_in_last_adaptation)
           {
             changedInLastAdaptation = true;
             break;
           }
       }
-      for(unsigned int spaces_i = 0; spaces_i < this->spaces.size(); spaces_i++)
+      for(unsigned int space_i = 0; space_i < this->spaces.size(); space_i++)
       {
-        if(current_state->e[spaces_i] == NULL)
+        if(current_state->e[space_i] == NULL)
           continue;
-        spaces[spaces_i]->get_element_assembly_list(current_state->e[spaces_i], current_als[spaces_i], this->spaces_first_dofs[spaces_i]);
+        spaces[space_i]->get_element_assembly_list(current_state->e[space_i], current_als[space_i], this->spaces_first_dofs[space_i]);
 
         // Check of potential new constraints.
         if(!this->do_not_use_cache)
         {
-          if(this->cache_records_element[spaces_i][current_state->e[spaces_i]->id] != NULL)
+          if(this->cache_records_element[space_i][current_state->e[space_i]->id] != NULL)
           {
-            if(this->cache_records_element[spaces_i][current_state->e[spaces_i]->id]->asmlistCnt != current_als[spaces_i]->cnt)
+            if(this->cache_records_element[space_i][current_state->e[space_i]->id]->asmlistCnt != current_als[space_i]->cnt)
               changedInLastAdaptation = true;
             else
             {
-              for(unsigned int idx_i = 0; idx_i < current_als[spaces_i]->cnt; idx_i++)
-                if(current_als[spaces_i]->idx[idx_i] != this->cache_records_element[spaces_i][current_state->e[spaces_i]->id]->asmlistIdx[idx_i])
+              for(unsigned int idx_i = 0; idx_i < current_als[space_i]->cnt; idx_i++)
+                if(current_als[space_i]->idx[idx_i] != this->cache_records_element[space_i][current_state->e[space_i]->id]->asmlistIdx[idx_i])
                   changedInLastAdaptation = true;
             }
           }
@@ -1907,166 +1582,117 @@ namespace Hermes
       }
       return changedInLastAdaptation;
     }
-
+      
     template<typename Scalar>
-    void DiscreteProblem<Scalar>::assemble_one_state(Solution<Scalar>** current_u_ext, AsmList<Scalar>** current_als, std::set<MeshFunction<Scalar>*> ext_functions, Traverse::State* current_state,
-      MatrixFormVol<Scalar>** current_mfvol, MatrixFormSurf<Scalar>** current_mfsurf, VectorFormVol<Scalar>** current_vfvol, VectorFormSurf<Scalar>** current_vfsurf)
+    DiscreteProblem<Scalar>::CacheRecord* DiscreteProblem<Scalar>::one_state_cache_record_calculate(Traverse::State* current_state, bool* is_natural_bnd_condition)
     {
-      // First some local variables needed in more places throughout this method.
-      // Info about natural boundary conditions presence.
-      // - structure.
-      bool isNaturalBndCondition[4];
-      // - get the info.
-      this->state_boundary_info(current_state, isNaturalBndCondition, current_mfsurf, current_vfsurf);
+      for(unsigned int space_i = 0; space_i < this->spaces.size(); space_i++)
+      {
+        if(current_state->e[space_i] == NULL)
+          continue;
 
-      // Assembly lists - for surface forms.
-      // For normal forms, they already come to this method as a parameter.
-      AsmList<Scalar>*** current_alsSurface = new AsmList<Scalar>**[this->spaces.size()];
+
+      // Order is known, we know how many integration points we need and we can proceed.
+      for(unsigned int space_i = 0; space_i < this->spaces.size(); space_i++)
+      {
+        if(current_state->e[space_i] == NULL)
+          continue;
+        if(!this->cache_element_stored[space_i][current_state->e[space_i]->id])
+#pragma omp critical (cache_for_element_preparation)
+        {
+          if(!this->cache_element_stored[space_i][current_state->e[space_i]->id])
+          {
+            if(this->cache_records_element[space_i][current_state->e[space_i]->id] == NULL)
+              this->cache_records_element[space_i][current_state->e[space_i]->id] = new CacheRecordPerElement;
+            else
+              this->cache_records_element[space_i][current_state->e[space_i]->id]->clear();
+              
+            this->cache_records_element[space_i][current_state->e[space_i]->id]->asmlistCnt = current_als[space_i]->cnt;
+            this->cache_records_element[space_i][current_state->e[space_i]->id]->asmlistIdx = new int[current_als[space_i]->cnt];
+            for(unsigned int asmlist_i = 0; asmlist_i < current_als[space_i]->cnt; asmlist_i++)
+              this->cache_records_element[space_i][current_state->e[space_i]->id]->asmlistIdx[asmlist_i] = current_als[space_i]->idx[asmlist_i];
+            this->cache_element_stored[space_i][current_state->e[space_i]->id] = true;
+          }
+        }
+
+        // newRecord created.
+        CacheRecordPerSubIdx* newRecord;
+#pragma omp critical (cache_for_subidx_preparation)
+        newRecord = (*this->cache_records_sub_idx[space_i][current_state->e[space_i]->id]->find(current_state->sub_idx[space_i])).second;
+        newRecord->nvert = current_state->rep->nvert;
+        RefMap refmap(current_state->e[0], current_state->sub_idx[0]);
+        init_geometry_points(&refmap, this->integration_order, newRecord->geometry, newRecord->jacobian_x_weights);
+      }
+
+      // Surface forms.
+      // The loop must be broken, as the surface functions will need different points.
       if(current_state->isBnd)
       {
-        for(unsigned int spaces_i = 0; spaces_i < this->spaces.size(); spaces_i++)
+        for(unsigned int space_i = 0; space_i < this->spaces.size(); space_i++)
         {
-          current_alsSurface[spaces_i] = new AsmList<Scalar>*[current_state->rep->nvert];
-          for (current_state->isurf = 0; current_state->isurf < current_state->rep->nvert; current_state->isurf++)
+          CacheRecordPerSubIdx* newRecord;
+#pragma omp critical (cache_for_subidx_preparation)
+          newRecord = (*this->cache_records_sub_idx[space_i][current_state->e[space_i]->id]->find(current_state->sub_idx[space_i])).second;
+          
+          // From now on, all about surface forms / geometries, etc.
+          newRecord->geometrySurface = new Geom<double>*[newRecord->nvert];
+          newRecord->jacobian_x_weightsSurface = new double*[newRecord->nvert];
+
+          // Get the surface points.
+          int order = this->integration_order;
+          for (current_state->isurf = 0; current_state->isurf < newRecord->nvert; current_state->isurf++)
           {
             if(!isNaturalBndCondition[current_state->isurf])
               continue;
-            spaces[spaces_i]->get_boundary_assembly_list(current_state->e[spaces_i], current_state->isurf, current_alsSurface[spaces_i][current_state->isurf], spaces_first_dofs[spaces_i]);
+            RefMap refmap(current_state->e[0], current_state->sub_idx[0]);
+            init_surface_geometry_points(&refmap, order, current_state, newRecord->geometrySurface[current_state->isurf], newRecord->jacobian_x_weightsSurface[current_state->isurf]);
+            order = this->integration_order;
           }
         }
       }
+    }
 
-      // Element changed === recalculate stuff.
-      bool changedInLastAdaptation = this->element_changed(current_state, current_als);
-      
-      // End of the local variables section.
-
-      
-
-      // We have to calculate, we can not use the cache.
-      if(changedInLastAdaptation || this->do_not_use_cache)
+    template<typename Scalar>
+    void DiscreteProblem<Scalar>::one_state_ext_init(Traverse::State* current_state, bool* is_natural_bnd_condition, Func<Scalar>** ext_funcs, Func<Scalar>** u_ext_funcs, Func<Scalar>*** ext_funcsSurf, Func<Scalar>*** u_ext_funcsSurf, Solution<Scalar>** u_ext, std::set<MeshFunction<Scalar>*> ext)
+    {
+      // Reference map calculation.
+      double3* xy_ref = g_quad_2d_std.get_points(this->integration_order, mode);
+      double* x_ref = new double[this->num_integration_points[mode]];
+      double* y_ref = new double[this->num_integration_points[mode]];
+      for(unsigned int i = 0; i < this->num_integration_points[mode]; i++)
       {
-        for(unsigned int spaces_i = 0; spaces_i < this->spaces.size(); spaces_i++)
-        {
-          if(current_state->e[spaces_i] == NULL)
-            continue;
-            
-#pragma omp critical (cache_for_subidx_preparation)
-          {
-            if(this->cache_records_sub_idx[spaces_i][current_state->e[spaces_i]->id] == NULL)
-            {
-              this->cache_records_sub_idx[spaces_i][current_state->e[spaces_i]->id] = new std::map<uint64_t, CacheRecordPerSubIdx*>;
-              this->cache_records_sub_idx[spaces_i][current_state->e[spaces_i]->id]->insert(std::pair<uint64_t, CacheRecordPerSubIdx*>(current_state->sub_idx[spaces_i], new CacheRecordPerSubIdx));
-            }
-            else
-            {
-              typename std::map<uint64_t, CacheRecordPerSubIdx*>::iterator it = this->cache_records_sub_idx[spaces_i][current_state->e[spaces_i]->id]->find(current_state->sub_idx[spaces_i]); 
-              if(it != this->cache_records_sub_idx[spaces_i][current_state->e[spaces_i]->id]->end())
-                (*it).second->clear();
-              else
-                this->cache_records_sub_idx[spaces_i][current_state->e[spaces_i]->id]->insert(std::pair<uint64_t, CacheRecordPerSubIdx*>(current_state->sub_idx[spaces_i], new CacheRecordPerSubIdx));
-            }
-          }
-        }
-
-        // Order is known, we know how many integration points we need and we can proceed.
-        for(unsigned int spaces_i = 0; spaces_i < this->spaces.size(); spaces_i++)
-        {
-          if(current_state->e[spaces_i] == NULL)
-            continue;
-          if(!this->cache_element_stored[spaces_i][current_state->e[spaces_i]->id])
-#pragma omp critical (cache_for_element_preparation)
-          {
-            if(!this->cache_element_stored[spaces_i][current_state->e[spaces_i]->id])
-            {
-              if(this->cache_records_element[spaces_i][current_state->e[spaces_i]->id] == NULL)
-                this->cache_records_element[spaces_i][current_state->e[spaces_i]->id] = new CacheRecordPerElement;
-              else
-                this->cache_records_element[spaces_i][current_state->e[spaces_i]->id]->clear();
-              
-              this->cache_records_element[spaces_i][current_state->e[spaces_i]->id]->asmlistCnt = current_als[spaces_i]->cnt;
-              this->cache_records_element[spaces_i][current_state->e[spaces_i]->id]->asmlistIdx = new int[current_als[spaces_i]->cnt];
-              for(unsigned int asmlist_i = 0; asmlist_i < current_als[spaces_i]->cnt; asmlist_i++)
-                this->cache_records_element[spaces_i][current_state->e[spaces_i]->id]->asmlistIdx[asmlist_i] = current_als[spaces_i]->idx[asmlist_i];
-              this->cache_element_stored[spaces_i][current_state->e[spaces_i]->id] = true;
-            }
-          }
-
-          // newRecord created.
-          CacheRecordPerSubIdx* newRecord;
-#pragma omp critical (cache_for_subidx_preparation)
-          newRecord = (*this->cache_records_sub_idx[spaces_i][current_state->e[spaces_i]->id]->find(current_state->sub_idx[spaces_i])).second;
-          newRecord->nvert = current_state->rep->nvert;
-          RefMap refmap(current_state->e[0], current_state->sub_idx[0]);
-          init_geometry_points(&refmap, this->integration_order, newRecord->geometry, newRecord->jacobian_x_weights);
-        }
-
-        // Surface forms.
-        // The loop must be broken, as the surface functions will need different points.
-        if(current_state->isBnd)
-        {
-          for(unsigned int spaces_i = 0; spaces_i < this->spaces.size(); spaces_i++)
-          {
-            CacheRecordPerSubIdx* newRecord;
-#pragma omp critical (cache_for_subidx_preparation)
-            newRecord = (*this->cache_records_sub_idx[spaces_i][current_state->e[spaces_i]->id]->find(current_state->sub_idx[spaces_i])).second;
-          
-            // From now on, all about surface forms / geometries, etc.
-            newRecord->geometrySurface = new Geom<double>*[newRecord->nvert];
-            newRecord->jacobian_x_weightsSurface = new double*[newRecord->nvert];
-
-            // Get the surface points.
-            int order = this->integration_order;
-            for (current_state->isurf = 0; current_state->isurf < newRecord->nvert; current_state->isurf++)
-            {
-              if(!isNaturalBndCondition[current_state->isurf])
-                continue;
-              RefMap refmap(current_state->e[0], current_state->sub_idx[0]);
-              init_surface_geometry_points(&refmap, order, current_state, newRecord->geometrySurface[current_state->isurf], newRecord->jacobian_x_weightsSurface[current_state->isurf]);
-              order = this->integration_order;
-            }
-          }
-        }
+        x_ref[i] = xy_ref[i][0];
+        y_ref[i] = xy_ref[i][1];
       }
-
-      // Ext.
-      Func<Scalar>** ext_funcs;
-      // Volumetric.
-      Func<Scalar>** u_ext_funcs = new Func<Scalar>*[this->spaces.size()];
-      // Surface.
-      Func<Scalar>** u_ext_funcsSurf[4];
-      RefMap refmap(current_state->e[0], current_state->sub_idx[0]);
-      double2x2* inv_ref_mapSurf[4];
-      double2x2* inv_ref_map = refmap.get_inv_ref_map(this->integration_order);
-
-      // Calculate u_ext.
-      if(current_u_ext != NULL || !ext_functions.empty())
-      {
-        // Reference coordinates.
-        double* x_refSurf[4];
-        double* y_refSurf[4];
-        double* x_physSurf[4];
-        double* y_physSurf[4];
-        // The u_ext - previous Newton iterations - functions.
-        // - surface.
-        if(current_state->isBnd)
-          for(unsigned int i = 0; i < 4; i++)
-            u_ext_funcsSurf[i] = new Func<Scalar>*[this->spaces.size()];
-
-        // Reference map calculation.
-        double3* xy_ref = refmap.get_quad_2d()->get_points(this->integration_order, current_state->e[0]->get_mode());
-        double* x_ref = new double[this->num_integration_points[current_state->e[0]->get_mode()]];
-        double* y_ref = new double[this->num_integration_points[current_state->e[0]->get_mode()]];
-        for(unsigned int i = 0; i < this->num_integration_points[current_state->e[0]->get_mode()]; i++)
-        {
-          x_ref[i] = xy_ref[i][0];
-          y_ref[i] = xy_ref[i][1];
-        }
-        double* x_phys = refmap.get_phys_x(this->integration_order);
-        double* y_phys = refmap.get_phys_y(this->integration_order);
+      double* x_phys = cache_record->geometry->x;
+      double* y_phys = cache_record->geometry->y;
         
-        // Surface.
-        if(current_state->isBnd)
+      // u_ext
+      if(u_ext != NULL)
+      {
+        u_ext_funcs = new Func<Scalar>*[this->spaces.size()];
+        for(unsigned int space_i = 0; space_i < this->spaces.size(); space_i++)
+        {
+          current_u_ext[space_i]->set_active_element(current_state->e[space_i]);
+          Func<Scalar>* tempFunc = current_u_ext[space_i]->calculate(x_phys, y_phys, x_ref, y_ref, this->num_integration_points[mode]);
+          u_ext_funcs[space_i] = tempFunc->transform(inv_ref_map);
+        }
+      }
+      if(!ext_functions.empty())
+      {
+        ext_funcs = new Func<Scalar>*[current_state->num];
+        for(std::set<MeshFunction<Scalar>*>::iterator it = ext_functions.begin(); it != ext_functions.end(); it++)
+        {
+          (*it)->set_active_element(current_state->e[(*it)->assemblyTraverseOrder]);
+          Func<Scalar>* tempFunc = (*it)->calculate(x_phys, y_phys, x_ref, y_ref, this->num_integration_points[mode]);
+          ext_funcs[(*it)->assemblyTraverseOrder] = tempFunc->transform(inv_ref_map);
+        }
+      }
+
+      // Surface.
+      if(current_state->isBnd)
+      {
+        if(current_u_ext != NULL || !ext_functions.empty())
         {
           for (current_state->isurf = 0; current_state->isurf < current_state->rep->nvert; current_state->isurf++)
           {
@@ -2075,12 +1701,12 @@ namespace Hermes
 
             int surfOrder = this->integration_order;
 
-            surfOrder = refmap.get_quad_2d()->get_edge_points(current_state->isurf, surfOrder, current_state->e[0]->get_mode());
-            double3* xy_refSurf = refmap.get_quad_2d()->get_points(surfOrder, current_state->e[0]->get_mode());
+            surfOrder = refmap.get_quad_2d()->get_edge_points(current_state->isurf, surfOrder, mode);
+            double3* xy_refSurf = refmap.get_quad_2d()->get_points(surfOrder, mode);
               
-            x_refSurf[current_state->isurf] = new double[this->num_integration_points_surf[current_state->e[0]->get_mode()][current_state->isurf]];
-            y_refSurf[current_state->isurf] = new double[this->num_integration_points_surf[current_state->e[0]->get_mode()][current_state->isurf]];
-            for(unsigned int i = 0; i < this->num_integration_points_surf[current_state->e[0]->get_mode()][current_state->isurf]; i++)
+            x_refSurf[current_state->isurf] = new double[this->num_integration_points_surf[mode][current_state->isurf]];
+            y_refSurf[current_state->isurf] = new double[this->num_integration_points_surf[mode][current_state->isurf]];
+            for(unsigned int i = 0; i < this->num_integration_points_surf[mode][current_state->isurf]; i++)
             {
               x_refSurf[current_state->isurf][i] = xy_refSurf[i][0];
               y_refSurf[current_state->isurf][i] = xy_refSurf[i][1];
@@ -2089,45 +1715,87 @@ namespace Hermes
             y_physSurf[current_state->isurf] = refmap.get_phys_y(surfOrder);
             inv_ref_mapSurf[current_state->isurf] = refmap.get_inv_ref_map(surfOrder);
           }
-        }
-        // u_ext
-        for(unsigned int spaces_i = 0; spaces_i < this->spaces.size(); spaces_i++)
-        {
-          current_u_ext[spaces_i]->set_active_element(current_state->e[spaces_i]);
-          Func<Scalar>* tempFunc = current_u_ext[spaces_i]->calculate(x_phys, y_phys, x_ref, y_ref, this->num_integration_points[current_state->e[0]->get_mode()]);
-          u_ext_funcs[spaces_i] = tempFunc->transform(inv_ref_map);
-          if(current_state->isBnd)
+
+          // u_ext
+          if(u_ext != NULL)
           {
-            for (current_state->isurf = 0; current_state->isurf < current_state->rep->nvert; current_state->isurf++)
+            u_ext_funcs = new Func<Scalar>*[this->spaces.size()];
+            for(unsigned int space_i = 0; space_i < this->spaces.size(); space_i++)
             {
-              if(!isNaturalBndCondition[current_state->isurf])
-                continue;
-              Func<Scalar>* tempFuncSurf = current_u_ext[spaces_i]->calculate(x_physSurf[current_state->isurf], y_physSurf[current_state->isurf], x_refSurf[current_state->isurf], y_refSurf[current_state->isurf], this->num_integration_points_surf[current_state->rep->get_mode()][current_state->isurf]);
-              u_ext_funcs[spaces_i] = tempFuncSurf->transform(inv_ref_mapSurf[current_state->isurf]);
+              for (current_state->isurf = 0; current_state->isurf < current_state->rep->nvert; current_state->isurf++)
+              {
+                if(!isNaturalBndCondition[current_state->isurf])
+                  continue;
+                u_ext_funcsSurf[current_state->isurf] = new Func<Scalar>*[this->spaces.size()];
+                Func<Scalar>* tempFuncSurf = current_u_ext[space_i]->calculate(x_physSurf[current_state->isurf], y_physSurf[current_state->isurf], x_refSurf[current_state->isurf], y_refSurf[current_state->isurf], this->num_integration_points_surf[mode][current_state->isurf]);
+                u_ext_funcsSurf[current_state->isurf][space_i] = tempFuncSurf->transform(inv_ref_mapSurf[current_state->isurf]);
+              }
             }
           }
-        }
-        if(!ext_functions.empty())
-        {
-          ext_funcs = new Func<Scalar>*[current_state->num];
-          for(std::set<MeshFunction<Scalar>*>::iterator it = ext_functions.begin(); it != ext_functions.end(); it++)
+          if(!ext_functions.empty())
           {
-            /*
-            ExtData<Scalar> ext;
-            ext.nf = form->ext.size();
-            ext.fn = new Func<Scalar>*[ext.nf];
-            for (unsigned i = 0; i < ext.nf; i++)
+            ext_funcs = new Func<Scalar>*[current_state->num];
+            for(std::set<MeshFunction<Scalar>*>::iterator it = ext_functions.begin(); it != ext_functions.end(); it++)
             {
-              if(form->ext[i] != NULL)
-                ext.fn[i] = form->ext[i]->calculate(x_phys[form->ext[i]->assemblyTraverseOrder], y_phys[form->ext[i]->assemblyTraverseOrder], x_ref[form->ext[i]->assemblyTraverseOrder], y_ref[form->ext[i]->assemblyTraverseOrder], np[form->ext[i]->assemblyTraverseOrder], inv_ref_map[form->ext[i]->assemblyTraverseOrder]);
-              else
-                ext.fn[i] = NULL;
+              for (current_state->isurf = 0; current_state->isurf < current_state->rep->nvert; current_state->isurf++)
+              {
+                if(!isNaturalBndCondition[current_state->isurf])
+                  continue;
+                ext_funcsSurf[current_state->isurf] = new Func<Scalar>*[this->spaces.size()];
+                Func<Scalar>* tempFuncSurf = (*it)->calculate(x_physSurf[current_state->isurf], y_physSurf[current_state->isurf], x_refSurf[current_state->isurf], y_refSurf[current_state->isurf], this->num_integration_points_surf[mode][current_state->isurf]);
+                ext_funcsSurf[current_state->isurf][(*it)->assemblyTraverseOrder] = tempFuncSurf->transform(inv_ref_mapSurf[current_state->isurf]);
+              }
             }
-            */
           }
         }
       }
+    }
 
+    template<typename Scalar>
+    void DiscreteProblem<Scalar>::assemble_one_state(Traverse::State* current_state, Solution<Scalar>** u_ext, std::set<MeshFunction<Scalar>*> ext, MatrixFormVol<Scalar>** current_mfvol, MatrixFormSurf<Scalar>** current_mfsurf, VectorFormVol<Scalar>** current_vfvol, VectorFormSurf<Scalar>** current_vfsurf)
+    {
+      // First some local variables needed in more places throughout this method.
+      int mode = mode;
+      // Info about natural boundary conditions presence.
+      // - structure.
+      bool is_natural_bnd_condition[4];
+      // - get the info.
+      this->one_state_boundary_info(current_state, is_natural_bnd_condition, current_mfsurf, current_vfsurf);
+
+      // Assembly lists.
+      AsmList<Scalar>** assembly_lists = new AsmList<Scalar>*[this->spaces.size()];
+      AsmList<Scalar>*** assembly_lists_surf;
+      this->one_state_get_assembly_lists(assembly_lists, assembly_lists_surf);
+
+      // Element changed ? (==> recalculate stuff).
+      bool changedInLastAdaptation = this->element_changed(current_state, assembly_lists);
+      
+      CacheRecord* cache_record = this->cache_records[current_state->rep->id];
+      // End of the local variables section.
+
+      // We have to calculate, we can not use the cache.
+      if(!this->cache_records_calculated[current_state->rep->id])
+      {
+        if(changedInLastAdaptation || this->do_not_use_cache || cache_record == NULL)
+        {
+          if(cache_record != NULL)
+            delete cache_record;
+          cache_record = one_state_cache_record_calculate(current_state, is_natural_bnd_condition);
+        }
+      }
+
+      // Transform test function values
+      Func<double>*** test_functions = new Func<double>[this->spaces.size()];
+      for(unsigned int space_i = 0; space_i < this->spaces.size(); space_i++)
+        test_functions[space_i] = this->precalculated_shapesets[mode][space_i]->transform_values(cache_record->inv_ref_map[space_i], current_state->sub_idx[space_i], this->num_integration_points);
+      
+      // Ext.
+      Func<Scalar>** ext_funcs;
+      Func<Scalar>** ext_funcsSurf[4];
+      Func<Scalar>** u_ext_funcs;
+      Func<Scalar>** u_ext_funcsSurf[4];
+      one_state_ext_init(current_state, is_natural_bnd_condition, ext_funcs, u_ext_funcs, ext_funcsSurf, u_ext_funcsSurf, u_ext, ext);
+        
       if(current_mat != NULL)
       {
         for(int current_mfvol_i = 0; current_mfvol_i < wf->mfvol.size(); current_mfvol_i++)
@@ -2136,22 +1804,28 @@ namespace Hermes
           if(!form_to_be_assembled(form, current_state))
             continue;
 
-          
-          CacheRecordPerSubIdx* CacheRecordPerSubIdxI;
-          CacheRecordPerSubIdx* CacheRecordPerSubIdxJ;
-#pragma omp critical (cache_for_subidx_preparation)
-          CacheRecordPerSubIdxI = this->cache_records_sub_idx[form->i][current_state->e[form->i]->id]->find(current_state->sub_idx[form->i])->second;
-#pragma omp critical (cache_for_subidx_preparation)
-          CacheRecordPerSubIdxJ = this->cache_records_sub_idx[form->j][current_state->e[form->j]->id]->find(current_state->sub_idx[form->j])->second;
+          ExtData<Scalar> extData;
+          extData.nf = form->ext.size();
+          extData.fn = new Func<Scalar>*[extData.nf];
+          for (unsigned i = 0; i < extData.nf; i++)
+          {
+            if(form->ext[i] != NULL)
+              extData.fn[i] = ext_funcs[form->ext[i]->assemblyTraverseOrder];
+            else
+              extData.fn[i] = NULL;
+          }
 
           assemble_matrix_form(form,
+            test_functions[form->i],
+            test_functions[form->j],
+            assembly_lists[form->i], 
+            assembly_lists[form->j], 
             u_ext_funcs,
-            NULL,
-            current_als[form->i], 
-            current_als[form->j], 
-            CacheRecordPerSubIdxI->geometry, 
-            CacheRecordPerSubIdxI->jacobian_x_weights, current_state->rep->get_mode(),
-            inv_ref_map);
+            &extData,
+            cache_record->geometry, 
+            cache_record->jacobian_x_weights, 
+            current_state,
+            cache_record->inv_ref_map[form->i]);
         }
       }
       if(current_rhs != NULL)
@@ -2162,16 +1836,28 @@ namespace Hermes
           if(!form_to_be_assembled(form, current_state))
             continue;
 
+          ExtData<Scalar> ext;
+          ext.nf = form->ext.size();
+          ext.fn = new Func<Scalar>*[ext.nf];
+          for (unsigned i = 0; i < ext.nf; i++)
+          {
+            if(form->ext[i] != NULL)
+              ext.fn[i] = ext_funcs[form->ext[i]->assemblyTraverseOrder];
+            else
+              ext.fn[i] = NULL;
+          }
+
           CacheRecordPerSubIdx* CacheRecordPerSubIdxI;
 #pragma omp critical (cache_for_subidx_preparation)
           CacheRecordPerSubIdxI = this->cache_records_sub_idx[form->i][current_state->e[form->i]->id]->find(current_state->sub_idx[form->i])->second;
 
           assemble_vector_form(form, 
             u_ext_funcs,
-            NULL,
+            &ext,
             current_als[form->i], 
             CacheRecordPerSubIdxI->geometry, 
-            CacheRecordPerSubIdxI->jacobian_x_weights, current_state->rep->get_mode(),
+            CacheRecordPerSubIdxI->jacobian_x_weights, 
+            current_state,
             inv_ref_map);
         }
       }
@@ -2192,6 +1878,17 @@ namespace Hermes
               if(!form_to_be_assembled(form, current_state))
                 continue;
 
+              ExtData<Scalar> ext;
+              ext.nf = form->ext.size();
+              ext.fn = new Func<Scalar>*[ext.nf];
+              for (unsigned i = 0; i < ext.nf; i++)
+              {
+                if(form->ext[i] != NULL)
+                  ext.fn[i] = ext_funcs[form->ext[i]->assemblyTraverseOrder];
+                else
+                  ext.fn[i] = NULL;
+              }
+
               CacheRecordPerSubIdx* CacheRecordPerSubIdxI;
               CacheRecordPerSubIdx* CacheRecordPerSubIdxJ;
   #pragma omp critical (cache_for_subidx_preparation)
@@ -2201,11 +1898,12 @@ namespace Hermes
 
               assemble_matrix_form(form, 
                 u_ext_funcsSurf[current_state->isurf], 
-                NULL,
+                &ext,
                 current_alsSurface[form->i][current_state->isurf], 
                 current_alsSurface[form->j][current_state->isurf], 
                 CacheRecordPerSubIdxI->geometrySurface[current_state->isurf], 
-                CacheRecordPerSubIdxI->jacobian_x_weightsSurface[current_state->isurf], current_state->rep->get_mode(),
+                CacheRecordPerSubIdxI->jacobian_x_weightsSurface[current_state->isurf],
+                current_state,
                 inv_ref_mapSurf[current_state->isurf]);
             }
           }
@@ -2219,16 +1917,28 @@ namespace Hermes
               if(!form_to_be_assembled(form, current_state))
                 continue;
 
+              ExtData<Scalar> ext;
+              ext.nf = form->ext.size();
+              ext.fn = new Func<Scalar>*[ext.nf];
+              for (unsigned i = 0; i < ext.nf; i++)
+              {
+                if(form->ext[i] != NULL)
+                  ext.fn[i] = ext_funcs[form->ext[i]->assemblyTraverseOrder];
+                else
+                  ext.fn[i] = NULL;
+              }
+
               CacheRecordPerSubIdx* CacheRecordPerSubIdxI;
   #pragma omp critical (cache_for_subidx_preparation)
               CacheRecordPerSubIdxI = this->cache_records_sub_idx[form->i][current_state->e[form->i]->id]->find(current_state->sub_idx[form->i])->second;
 
               assemble_vector_form(form, 
                 u_ext_funcsSurf[current_state->isurf], 
-                NULL,
+                &ext,
                 current_alsSurface[form->i][current_state->isurf], 
                 CacheRecordPerSubIdxI->geometrySurface[current_state->isurf], 
-                CacheRecordPerSubIdxI->jacobian_x_weightsSurface[current_state->isurf], current_state->rep->get_mode(),
+                CacheRecordPerSubIdxI->jacobian_x_weightsSurface[current_state->isurf],
+                current_state,
                 inv_ref_mapSurf[current_state->isurf]);
             }
           }
@@ -2242,65 +1952,11 @@ namespace Hermes
     }
 
     template<typename Scalar>
-    int DiscreteProblem<Scalar>::calc_order_matrix_form(MatrixForm<Scalar> *form, RefMap** current_refmaps, Solution<Scalar>** current_u_ext, Traverse::State* current_state)
+    void DiscreteProblem<Scalar>::assemble_matrix_form(MatrixForm<Scalar>* form, Func<double>** test_functions, Func<double>** basis_functions, 
+      AsmList<Scalar>* current_als_i, AsmList<Scalar>* current_als_j, Func<Scalar>** u_ext, ExtData<Scalar>* ext,
+      Geom<double>* geometry, double* jacobian_x_weights, Traverse::State* current_state)
     {
-      int order;
-
-      if(is_fvm)
-        order = current_refmaps[form->i]->get_inv_ref_order();
-      else
-      {
-        // order of solutions from the previous Newton iteration etc..
-        Func<Hermes::Ord>** u_ext_ord = new Func<Hermes::Ord>*[RungeKutta ? RK_original_spaces_count : this->wf->get_neq() - form->u_ext_offset];
-        ExtData<Hermes::Ord> ext_ord;
-        init_ext_orders(form, u_ext_ord, &ext_ord, current_u_ext, current_state);
-
-        // Order of shape functions.
-        int max_order_j = this->spaces[form->j]->get_element_order(current_state->e[form->j]->id);
-        int max_order_i = this->spaces[form->i]->get_element_order(current_state->e[form->i]->id);
-        if(H2D_GET_V_ORDER(max_order_i) > H2D_GET_H_ORDER(max_order_i))
-          max_order_i = H2D_GET_V_ORDER(max_order_i);
-        else
-          max_order_i = H2D_GET_H_ORDER(max_order_i);
-        if(H2D_GET_V_ORDER(max_order_j) > H2D_GET_H_ORDER(max_order_j))
-          max_order_j = H2D_GET_V_ORDER(max_order_j);
-        else
-          max_order_j = H2D_GET_H_ORDER(max_order_j);
-
-        for (unsigned int k = 0; k < current_state->rep->nvert; k++)
-        {
-          int eo = this->spaces[form->i]->get_edge_order(current_state->e[form->i], k);
-          if(eo > max_order_i)
-            max_order_i = eo;
-          eo = this->spaces[form->j]->get_edge_order(current_state->e[form->j], k);
-          if(eo > max_order_j)
-            max_order_j = eo;
-        }
-
-        Func<Hermes::Ord>* ou = init_fn_ord(max_order_j + (spaces[form->j]->get_shapeset()->get_num_components() > 1 ? 1 : 0));
-        Func<Hermes::Ord>* ov = init_fn_ord(max_order_i + (spaces[form->i]->get_shapeset()->get_num_components() > 1 ? 1 : 0));
-
-        // Total order of the vector form.
-        Hermes::Ord o = form->ord(1, &fake_wt, u_ext_ord, ou, ov, &geom_ord, &ext_ord);
-
-        adjust_order_to_refmaps(form, order, &o, current_refmaps);
-
-        // Cleanup.
-        deinit_ext_orders(form, u_ext_ord, &ext_ord);
-        delete [] u_ext_ord;
-        ou->free_ord();
-        delete ou;
-        ov->free_ord();
-        delete ov;
-      }
-      return order;
-    }
-
-    template<typename Scalar>
-    void DiscreteProblem<Scalar>::assemble_matrix_form(MatrixForm<Scalar>* form, Func<Scalar>** u_ext, ExtData<Scalar>* ext,
-      AsmList<Scalar>* current_als_i, AsmList<Scalar>* current_als_j, Geom<double>* geometry, double* jacobian_x_weights, 
-      Hermes::Hermes2D::ElementMode2D mode, double2x2* inv_ref_map)
-    {
+      int mode = current_state->rep->get_mode();
       bool surface_form = (dynamic_cast<MatrixFormVol<Scalar>*>(form) == NULL);
 
       double block_scaling_coef = this->block_scaling_coeff(form);
@@ -2337,22 +1993,13 @@ namespace Hermes
               if(std::abs(current_als_j->coef[j]) < 1e-12)
                 continue;
 
-              Func<double>* u;
-              if(surface_form)
-                u = this->precalculated_shapesets_surf[mode][geometry->isurf][form->j][current_als_i->dof[j]]->transform(inv_ref_map);
-              else
-                u = this->precalculated_shapesets[mode][form->j][current_als_i->dof[j]]->transform(inv_ref_map);
-
-              Func<double>* v;
-              if(surface_form)
-                v = this->precalculated_shapesets_surf[mode][geometry->isurf][form->i][current_als_i->dof[i]]->transform(inv_ref_map);
-              else
-                v = this->precalculated_shapesets[mode][form->i][current_als_i->dof[i]]->transform(inv_ref_map);
+              Func<double>* u = basis_functions[j];
+              Func<double>* v = test_functions[i];
 
               if(surface_form)
-                local_stiffness_matrix[i][j] = 0.5 * block_scaling_coeff(form) * form->value(this->num_integration_points_surf[geometry->isurf], jacobian_x_weights, u_ext, u, v, geometry, ext) * form->scaling_factor * current_als_j->coef[j] * current_als_i->coef[i];
+                local_stiffness_matrix[i][j] = 0.5 * block_scaling_coeff(form) * form->value(this->num_integration_points_surf[mode][current_state->isurf], jacobian_x_weights, u_ext, u, v, geometry, ext) * form->scaling_factor * current_als_j->coef[j] * current_als_i->coef[i];
               else
-                local_stiffness_matrix[i][j] = block_scaling_coeff(form) * form->value(this->num_integration_points, jacobian_x_weights, u_ext, u, v, geometry, ext) * form->scaling_factor * current_als_j->coef[j] * current_als_i->coef[i];
+                local_stiffness_matrix[i][j] = block_scaling_coeff(form) * form->value(this->num_integration_points[mode], jacobian_x_weights, u_ext, u, v, geometry, ext) * form->scaling_factor * current_als_j->coef[j] * current_als_i->coef[i];
             }
           }
         }
@@ -2369,10 +2016,10 @@ namespace Hermes
               if(std::abs(current_als_j->coef[j]) < 1e-12)
                 continue;
 
-              Func<double>* u = base_fns[j];
-              Func<double>* v = test_fns[i];
+              Func<double>* u = basis_functions[j];
+              Func<double>* v = test_functions[i];
 
-              Scalar val = block_scaling_coeff(form) * form->value(this->num_integration_points, jacobian_x_weights, u_ext, u, v, geometry, ext) * form->scaling_factor * current_als_j->coef[j] * current_als_i->coef[i];
+              Scalar val = block_scaling_coeff(form) * form->value(this->num_integration_points[mode], jacobian_x_weights, u_ext, u, v, geometry, ext) * form->scaling_factor * current_als_j->coef[j] * current_als_i->coef[i];
 
               local_stiffness_matrix[i][j] = local_stiffness_matrix[j][i] = val;
             }
@@ -2400,52 +2047,11 @@ namespace Hermes
     }
 
     template<typename Scalar>
-    int DiscreteProblem<Scalar>::calc_order_vector_form(VectorForm<Scalar> *form, RefMap** current_refmaps, Solution<Scalar>** current_u_ext, Traverse::State* current_state)
+    void DiscreteProblem<Scalar>::assemble_vector_form((VectorForm<Scalar>* form, Func<double>** test_functions, 
+        AsmList<Scalar>* current_als_i, Func<Scalar>** u_ext, ExtData<Scalar>* ext, Geom<double>* geometry,
+        double* jacobian_x_weights, Traverse::State* current_state)
     {
-      int order;
-
-      if(is_fvm)
-        order = current_refmaps[form->i]->get_inv_ref_order();
-      else
-      {
-        // order of solutions from the previous Newton iteration etc..
-        Func<Hermes::Ord>** u_ext_ord = new Func<Hermes::Ord>*[RungeKutta ? RK_original_spaces_count : this->wf->get_neq() - form->u_ext_offset];
-        ExtData<Hermes::Ord> ext_ord;
-        init_ext_orders(form, u_ext_ord, &ext_ord, current_u_ext, current_state);
-
-        // Order of shape functions.
-        int max_order_i = this->spaces[form->i]->get_element_order(current_state->e[form->i]->id);
-        if(H2D_GET_V_ORDER(max_order_i) > H2D_GET_H_ORDER(max_order_i))
-          max_order_i = H2D_GET_V_ORDER(max_order_i);
-        else
-          max_order_i = H2D_GET_H_ORDER(max_order_i);
-
-        for (unsigned int k = 0; k < current_state->rep->nvert; k++)
-        {
-          int eo = this->spaces[form->i]->get_edge_order(current_state->e[form->i], k);
-          if(eo > max_order_i)
-            max_order_i = eo;
-        }
-        Func<Hermes::Ord>* ov = init_fn_ord(max_order_i + (spaces[form->i]->get_shapeset()->get_num_components() > 1 ? 1 : 0));
-
-        // Total order of the vector form.
-        Hermes::Ord o = form->ord(1, &fake_wt, u_ext_ord, ov, &geom_ord, &ext_ord);
-
-        adjust_order_to_refmaps(form, order, &o, current_refmaps);
-
-        // Cleanup.
-        deinit_ext_orders(form, u_ext_ord, &ext_ord);
-        delete [] u_ext_ord;
-        ov->free_ord();
-        delete ov;
-      }
-      return order;
-    }
-
-    template<typename Scalar>
-    void DiscreteProblem<Scalar>::assemble_vector_form(VectorForm<Scalar>* form, Func<Scalar>** u_ext, ExtData<Scalar>* ext,
-      AsmList<Scalar>* current_als_i, Geom<double>* geometry, double* jacobian_x_weights, Hermes::Hermes2D::ElementMode2D mode, double2x2* inv_ref_map)
-    {
+      int mode = current_state->rep->get_mode();
       bool surface_form = (dynamic_cast<VectorFormVol<Scalar>*>(form) == NULL);
 
       // External functions adjustment (almost exclusively for RungeKutta)
@@ -2464,160 +2070,19 @@ namespace Hermes
         if(std::abs(current_als_i->coef[i]) < 1e-12)
           continue;
 
-        Func<double>* v;
-        if(surface_form)
-          v = this->precalculated_shapesets_surf[mode][geometry->isurf][form->i][current_als_i->dof[i]]->transform(inv_ref_map);
-        else
-          v = this->precalculated_shapesets[mode][form->i][current_als_i->dof[i]]->transform(inv_ref_map);
+        Func<double>* v = test_functions[i];
 
         Scalar val;
         if(surface_form)
-          val = 0.5 * form->value(this->num_integration_points_surf[geometry->isurf], jacobian_x_weights, u_ext, v, geometry, ext) * form->scaling_factor * current_als_i->coef[i];
+          val = 0.5 * form->value(this->num_integration_points_surf[mode][current_state->isurf], jacobian_x_weights, u_ext, v, geometry, ext) * form->scaling_factor * current_als_i->coef[i];
         else
-          val = form->value(this->num_integration_points, jacobian_x_weights, u_ext, v, geometry, ext) * form->scaling_factor * current_als_i->coef[i];
+          val = form->value(this->num_integration_points[mode], jacobian_x_weights, u_ext, v, geometry, ext) * form->scaling_factor * current_als_i->coef[i];
 
         current_rhs->add(current_als_i->dof[i], val);
       }
 
       // Cleanup.
       u_ext -= form->u_ext_offset;
-    }
-
-    template<typename Scalar>
-    int DiscreteProblem<Scalar>::init_geometry_points(RefMap* reference_mapping, int order, Geom<double>*& geometry, double*& jacobian_x_weights)
-    {
-      double3* pt = reference_mapping->get_quad_2d()->get_points(order, reference_mapping->get_active_element()->get_mode());
-      int np = reference_mapping->get_quad_2d()->get_num_points(order, reference_mapping->get_active_element()->get_mode());
-
-      // Init geometry and jacobian*weights.
-      geometry = init_geom_vol(reference_mapping, order);
-      double* jac = NULL;
-      if(!reference_mapping->is_jacobian_const())
-        jac = reference_mapping->get_jacobian(order);
-      jacobian_x_weights = new double[np];
-      for(int i = 0; i < np; i++)
-      {
-        if(reference_mapping->is_jacobian_const())
-          jacobian_x_weights[i] = pt[i][2] * reference_mapping->get_const_jacobian();
-        else
-          jacobian_x_weights[i] = pt[i][2] * jac[i];
-      }
-      return np;
-    }
-
-    template<typename Scalar>
-    int DiscreteProblem<Scalar>::init_surface_geometry_points(RefMap* reference_mapping, int& order, Traverse::State* current_state, Geom<double>*& geometry, double*& jacobian_x_weights)
-    {
-      int eo = reference_mapping->get_quad_2d()->get_edge_points(current_state->isurf, order, reference_mapping->get_active_element()->get_mode());
-      double3* pt = reference_mapping->get_quad_2d()->get_points(eo, reference_mapping->get_active_element()->get_mode());
-      int np = reference_mapping->get_quad_2d()->get_num_points(eo, reference_mapping->get_active_element()->get_mode());
-
-      // Init geometry and jacobian*weights.
-      double3* tan;
-      geometry = init_geom_surf(reference_mapping, current_state->isurf, current_state->rep->en[current_state->isurf]->marker, eo, tan);
-      jacobian_x_weights = new double[np];
-      for(int i = 0; i < np; i++)
-        jacobian_x_weights[i] = pt[i][2] * tan[i][2];
-      order = eo;
-      return np;
-    }
-
-    template<typename Scalar>
-    void DiscreteProblem<Scalar>::init_ext_orders(Form<Scalar> *form, Func<Hermes::Ord>** oi, ExtData<Hermes::Ord>* oext, Solution<Scalar>** current_u_ext, Traverse::State* current_state)
-    {
-      unsigned int prev_size = RungeKutta ? RK_original_spaces_count : this->wf->get_neq() - form->u_ext_offset;
-      bool surface_form = (current_state->isurf > -1);
-
-      if(current_u_ext != NULL)
-        for(int i = 0; i < prev_size; i++)
-          if(current_u_ext[i + form->u_ext_offset] != NULL)
-            if(surface_form)
-              oi[i] = init_fn_ord(current_u_ext[i + form->u_ext_offset]->get_edge_fn_order(current_state->isurf) + (current_u_ext[i + form->u_ext_offset]->get_num_components() > 1 ? 1 : 0));
-            else
-              oi[i] = init_fn_ord(current_u_ext[i + form->u_ext_offset]->get_fn_order() + (current_u_ext[i + form->u_ext_offset]->get_num_components() > 1 ? 1 : 0));
-          else
-            oi[i] = init_fn_ord(0);
-      else
-        for(int i = 0; i < prev_size; i++)
-          oi[i] = init_fn_ord(0);
-
-      oext->nf = form->ext.size();
-      if(oext->nf > 0)
-        oext->fn = new Func<Hermes::Ord>*[oext->nf];
-      for (int i = 0; i < oext->nf; i++)
-        if(surface_form)
-          oext->fn[i] = init_fn_ord(form->ext[i]->get_edge_fn_order(current_state->isurf) + (form->ext[i]->get_num_components() > 1 ? 1 : 0));
-        else
-          oext->fn[i] = init_fn_ord(form->ext[i]->get_fn_order() + (form->ext[i]->get_num_components() > 1 ? 1 : 0));
-    }
-
-    template<typename Scalar>
-    void DiscreteProblem<Scalar>::deinit_ext_orders(Form<Scalar> *form, Func<Hermes::Ord>** oi, ExtData<Hermes::Ord>* oext)
-    {
-      unsigned int prev_size = RungeKutta ? RK_original_spaces_count : this->wf->get_neq() - form->u_ext_offset;
-      for(int i = 0; i < prev_size; i++)
-      {
-        oi[i]->free_ord();
-        delete oi[i];
-      }
-
-      oext->nf = form->ext.size();
-      for (int i = 0; i < oext->nf; i++)
-      {
-        oext->fn[i]->free_ord();
-        delete oext->fn[i];
-      }
-
-      if(oext->nf > 0)
-        delete [] oext->fn;
-    }
-
-    template<typename Scalar>
-    void DiscreteProblem<Scalar>::init_ext(Form<Scalar> *form, Func<Scalar>** u_ext, ExtData<Scalar>* ext, int order, Solution<Scalar>** current_u_ext, Traverse::State* current_state)
-    {
-      unsigned int prev_size = RungeKutta ? RK_original_spaces_count : this->wf->get_neq() - form->u_ext_offset;
-
-      if(current_u_ext != NULL)
-        for(int i = 0; i < prev_size; i++)
-          if(current_u_ext[i + form->u_ext_offset] != NULL)
-            u_ext[i] = current_state->e[i] == NULL ? NULL : init_fn(current_u_ext[i + form->u_ext_offset], order);
-          else
-            u_ext[i] = NULL;
-      else
-        for(int i = 0; i < prev_size; i++)
-          u_ext[i] = NULL;
-
-      ext->nf = form->ext.size();
-      ext->fn = new Func<Scalar>*[ext->nf];
-      for (unsigned i = 0; i < ext->nf; i++)
-      {
-        if(form->ext[i] != NULL)
-          ext->fn[i] = init_fn(form->ext[i], order);
-        else
-          ext->fn[i] = NULL;
-      }
-    }
-
-    template<typename Scalar>
-    void DiscreteProblem<Scalar>::deinit_ext(Form<Scalar> *form, Func<Scalar>** u_ext, ExtData<Scalar>* ext)
-    {
-      // Values of the previous Newton iteration, shape functions
-      // and external functions in quadrature points.
-      int prev_size = this->wf->get_neq() - form->u_ext_offset;
-      // In case of Runge-Kutta, this is time-saving, as it is known how many functions are there for the user.
-      if(this->RungeKutta)
-        prev_size = this->RK_original_spaces_count;
-
-    }
-
-    template<typename Scalar>
-    void DiscreteProblem<Scalar>::adjust_order_to_refmaps(Form<Scalar> *form, int& order, Hermes::Ord* o, RefMap** current_refmaps)
-    {
-      // Increase due to reference map.
-      int coordinate = (dynamic_cast<VectorForm<Scalar>*>(form) == NULL) ? (static_cast<MatrixForm<Scalar>*>(form)->i) : (static_cast<VectorForm<Scalar>*>(form)->i);
-      order = current_refmaps[coordinate]->get_inv_ref_order();
-      order += o->get_order();
-      limit_order(order, current_refmaps[coordinate]->get_active_element()->get_mode());
     }
 
     template<typename Scalar>

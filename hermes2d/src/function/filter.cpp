@@ -300,7 +300,7 @@ namespace Hermes
     }
 
     template<typename Scalar>
-    Func<Scalar>* SimpleFilter<Scalar>::calculate(double* x_phys, double* y_phys, double* x_ref, double* y_ref, int np, double2x2* inv_ref_map)
+    Func<Scalar>* SimpleFilter<Scalar>::calculate(double* x_phys, double* y_phys, double* x_ref, double* y_ref, int np)
     {
       return NULL;
     }
@@ -435,7 +435,7 @@ namespace Hermes
       this->sln_complex->pop_transform();
     }
 
-    Func<double>* ComplexFilter::calculate(double* x_phys, double* y_phys, double* x_ref, double* y_ref, int np, double2x2* inv_ref_map)
+    Func<double>* ComplexFilter::calculate(double* x_phys, double* y_phys, double* x_ref, double* y_ref, int np)
     {
       return NULL;
     }
@@ -925,7 +925,7 @@ namespace Hermes
         throw Hermes::Exceptions::Exception("RealFilter only supports one MeshFunction.");
     };
 
-    Func<double>* VonMisesFilter::calculate(double* x_phys, double* y_phys, double* x_ref, double* y_ref, int np, double2x2* inv_ref_map)
+    Func<double>* VonMisesFilter::calculate(double* x_phys, double* y_phys, double* x_ref, double* y_ref, int np)
     {
       return NULL;
     }

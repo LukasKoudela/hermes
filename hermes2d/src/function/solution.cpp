@@ -1021,7 +1021,7 @@ namespace Hermes
           u->val = new Scalar[np];
           u->dx = new Scalar[np];
           u->dy = new Scalar[np];
-          for (int i = 0; i < np; i++, inv_ref_map++)
+          for (int i = 0; i < np; i++)
           {
             u->val[i] = result[0][0][i];
             u->dx[i] = result[0][1][i];
@@ -1036,7 +1036,7 @@ namespace Hermes
           u->dy0 = new double[np];
           u->curl = new Scalar[np];
 
-          for (int i = 0; i < np; i++, inv_ref_map++)
+          for (int i = 0; i < np; i++)
           {
             u->val0[i] = result[0][0][i];
             u->val1[i] = result[1][0][i];
@@ -1052,7 +1052,7 @@ namespace Hermes
           u->dx0 = new double[np];
           u->dy1 = new double[np];
           u->div = new Scalar[np];
-          for (int i = 0; i < np; i++, inv_ref_map++)
+          for (int i = 0; i < np; i++)
           {
             u->val0[i] = result[0][0][i];
             u->val1[i] = result[1][0][i];

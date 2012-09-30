@@ -116,7 +116,7 @@ namespace Hermes
         u->dx  = new double[np];
         u->dy  = new double[np];
 
-        for (int i = 0; i < np; i++, inv_ref_map++)
+        for (int i = 0; i < np; i++)
         {
           u->val[i] = shapeset->get_value(0, this->index, xy[i][0], xy[i][1], 0, element->get_mode());
           u->dx[i] = shapeset->get_value(1, this->index, xy[i][0], xy[i][1], 0, element->get_mode());
@@ -131,7 +131,7 @@ namespace Hermes
         u->dy0 = new double[np];
         u->curl = new double[np];
 
-        for (int i = 0; i < np; i++, inv_ref_map++)
+        for (int i = 0; i < np; i++)
         {
           u->val0[i] = shapeset->get_value(0, this->index, xy[i][0], xy[i][1], 0, element->get_mode());
           u->val1[i] = shapeset->get_value(0, this->index, xy[i][0], xy[i][1], 1, element->get_mode());
@@ -148,7 +148,7 @@ namespace Hermes
         u->dy1 = new double[np];
         u->div = new double[np];
 
-        for (int i = 0; i < np; i++, inv_ref_map++)
+        for (int i = 0; i < np; i++)
         {
           u->val0[i] = shapeset->get_value(0, this->index, xy[i][0], xy[i][1], 0, element->get_mode());
           u->val1[i] = shapeset->get_value(0, this->index, xy[i][0], xy[i][1], 1, element->get_mode());
@@ -156,8 +156,6 @@ namespace Hermes
           u->dy1[i] = shapeset->get_value(2, this->index, xy[i][0], xy[i][1], 1, element->get_mode());
         }
       }
-
-      inv_ref_map -= np;
 
       return u;
     }

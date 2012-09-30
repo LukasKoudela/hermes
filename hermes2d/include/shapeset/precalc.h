@@ -102,6 +102,19 @@ namespace Hermes
       /// quadrature table selector (0-7), mode of the shape function (triangle/quad),
       /// and shape function index to a table from the middle layer.
       LightArray<std::map<uint64_t, LightArray<Node*>*>*> tables;
+      
+    public:
+      class Values
+      {
+      public:
+        double* values[2][6];
+      };
+      
+      Values* zero_sub_idx_table;
+
+      std::map<uint64_t, Values*> sub_idx_tables;
+
+      Func<double>** transform_values(double2x2* inv_ref_map, uint64_t sub_idx, int np);
 
       int index;
 
@@ -113,7 +126,8 @@ namespace Hermes
       bool is_slave() const;
 
       virtual void precalculate(int order, int mask);
-      Func<double>* calculate(double3* xy, int np) const;
+
+      void calculate(uint64_t sub_idx, double3* xy, int np, int index) const;
 
       void update_max_index();
 

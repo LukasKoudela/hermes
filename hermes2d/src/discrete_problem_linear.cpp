@@ -47,7 +47,7 @@ namespace Hermes
     DiscreteProblemLinear<Scalar>::~DiscreteProblemLinear()
     {
     }
-
+    /*
     template<typename Scalar>
     void DiscreteProblemLinear<Scalar>::assemble(SparseMatrix<Scalar>* mat,
       Vector<Scalar>* rhs,
@@ -207,7 +207,7 @@ namespace Hermes
             // The proper sub-element mappings to all the functions of
             // this stage is supplied by the function Traverse::get_next_state()
             // called in the while loop.
-            this->assemble_one_state(current_u_ext, current_als, &current_state, current_mfvol, current_mfsurf, current_vfvol, current_vfsurf);
+            this->assemble_one_state(current_u_ext, current_als, ext_functions, &current_state, current_mfvol, current_mfsurf, current_vfvol, current_vfsurf);
 
             if(this->DG_matrix_forms_present || this->DG_vector_forms_present)
               this->assemble_one_DG_state(current_pss, current_spss, current_refmaps, NULL, current_als, &current_state, current_mfDG, current_vfDG, trav[omp_get_thread_num()].fn);
@@ -500,7 +500,7 @@ namespace Hermes
       deinit_ext(form, u_ext, &ext);
       delete [] local_stiffness_matrix;
     }
-
+    */
     template class HERMES_API DiscreteProblemLinear<double>;
     template class HERMES_API DiscreteProblemLinear<std::complex<double> >;
   }
