@@ -153,23 +153,26 @@ namespace Hermes
 
       //////////////////////////
       /// Assemble one state.///
-      void assemble_one_state(Solution<Scalar>** current_u_ext, AsmList<Scalar>** current_als, std::set<MeshFunction<Scalar>*> ext_functions, Traverse::State* current_state,
-           MatrixFormVol<Scalar>** current_mfvol, MatrixFormSurf<Scalar>** current_mfsurf, VectorFormVol<Scalar>** current_vfvol, VectorFormSurf<Scalar>** current_vfsurf);
+      void assemble_one_state(Traverse::State* current_state, Solution<Scalar>** u_ext, std::set<MeshFunction<Scalar>*> ext, MatrixFormVol<Scalar>** current_mfvol, MatrixFormSurf<Scalar>** current_mfsurf, VectorFormVol<Scalar>** current_vfvol, VectorFormSurf<Scalar>** current_vfsurf);
 
       /// Investigates if surface forms are to be assembled and prepared in this state.
       bool one_state_boundary_info(Traverse::State* current_state, bool* is_natural_bnd_condition, MatrixFormSurf<Scalar>** current_mfsurf, VectorFormSurf<Scalar>** current_vfsurf);
 
       /// Decides whether or not this state information are possible to be found in the cache.
-      bool one_state_changed(Traverse::State* current_state, AsmList<Scalar>** current_als);
+      bool one_state_element_changed(Traverse::State* current_state);
 
       /// Assembly lists obtaining.
       void one_state_get_assembly_lists(Traverse::State* current_state, AsmList<Scalar>** assembly_lists, AsmList<Scalar>*** assembly_lists_surf, bool* is_natural_bnd_condition);
       
       /// Calculate and return the proper cache record.
-      DiscreteProblem<Scalar>::CacheRecord* one_state_cache_record_calculate(Traverse::State* current_state, bool* is_natural_bnd_condition);
+      class CacheRecord;
+      CacheRecord* one_state_cache_record_calculate(Traverse::State* current_state, bool* is_natural_bnd_condition);
       
       /// Calculate external functions.
-      void one_state_ext_init(Traverse::State* current_state, bool* is_natural_bnd_condition, Func<Scalar>** ext_funcs, Func<Scalar>** u_ext_funcs, Func<Scalar>*** ext_funcsSurf, Func<Scalar>*** u_ext_funcsSurf, Solution<Scalar>** u_ext, std::set<MeshFunction<Scalar>*> ext);
+      void one_state_ext_init(Traverse::State* current_state, bool* is_natural_bnd_condition, Func<Scalar>** ext_funcs, Func<Scalar>** u_ext_funcs, Func<Scalar>*** ext_funcsSurf, Func<Scalar>*** u_ext_funcsSurf, Solution<Scalar>** u_ext, std::set<MeshFunction<Scalar>*> ext, CacheRecord* cache_record);
+
+      /// Prepare external functions structure to be passed to Form::value().
+      void one_state_prepare_form_ext_data(Form<Scalar>* form, Func<Scalar>** ext_funcs, ExtData<Scalar>& extData);
 
       /// Matrix forms - assemble the form.
       virtual void assemble_matrix_form(MatrixForm<Scalar>* form, Func<double>** test_functions, Func<double>** basis_functions, 
@@ -267,12 +270,12 @@ namespace Hermes
       public:
         void clear();
         Geom<double>* geometry;
-        Geom<double>** geometrySurface;
+        Geom<double>** geometry_surf;
         double* jacobian_x_weights;
-        double** jacobian_x_weightsSurface;
+        double** jacobian_x_weights_surf;
         int nvert;
         double2x2** inv_ref_map;
-        double2x2*** inv_ref_mapSurface;
+        double2x2*** inv_ref_map_surf;
       };
 
       CacheRecord** cache_records;
@@ -289,8 +292,6 @@ namespace Hermes
 
       /// Set the special handling of external functions of Runge-Kutta methods, including information how many spaces were there in the original problem.
       inline void set_RK(int original_spaces_count) { this->RungeKutta = true; RK_original_spaces_count = original_spaces_count; }
-
-      
 
 
       ///* DG *///

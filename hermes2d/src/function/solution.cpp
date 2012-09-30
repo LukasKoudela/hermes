@@ -971,7 +971,7 @@ namespace Hermes
     }
 
     template<typename Scalar>
-    Func<Scalar>* Solution<Scalar>::calculate(double* x_phys, double* y_phys, double* x_ref, double* y_ref, int np)
+    Func<Scalar>* Solution<Scalar>::calculate(double* x_phys, double* y_phys, double* x_ref, double* y_ref, int np, double2x2* inv_ref_map)
     {
       Func<Scalar>* u = new Func<Scalar>(np, this->num_components);
       SpaceType space_type = this->get_space_type();

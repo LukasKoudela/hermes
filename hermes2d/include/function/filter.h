@@ -123,7 +123,7 @@ namespace Hermes
       virtual Scalar get_pt_value(double x, double y, int item = H2D_FN_VAL_0);
 
     protected:
-      virtual Func<Scalar>* calculate(double* x_phys, double* y_phys, double* x_ref, double* y_ref, int np);
+      virtual Func<Scalar>* calculate(double* x_phys, double* y_phys, double* x_ref, double* y_ref, int np, double2x2* inv_ref_map);
 
       int item[10];
 

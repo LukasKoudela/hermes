@@ -107,12 +107,12 @@ namespace Hermes
       class Values
       {
       public:
-        double* values[2][6];
+        double values[2][6];
       };
       
-      Values* zero_sub_idx_table;
+      Values** zero_sub_idx_table;
 
-      std::map<uint64_t, Values*> sub_idx_tables;
+      std::map<uint64_t, Values**> sub_idx_tables;
 
       Func<double>** transform_values(double2x2* inv_ref_map, uint64_t sub_idx, int np);
 
