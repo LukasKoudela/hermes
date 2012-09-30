@@ -33,6 +33,9 @@ namespace Hermes
       assert(num_components == 1 || num_components == 2);
       update_max_index();
       set_quad_2d(&g_quad_2d_std);
+
+      this->zero_sub_idx_table = new Values*[shapeset->get_max_index(HERMES_MODE_QUAD)];
+      memset(this->zero_sub_idx_table, NULL, shapeset->get_max_index(HERMES_MODE_QUAD) * sizeof(Values*));
     }
 
     PrecalcShapeset::PrecalcShapeset(PrecalcShapeset* pss) : Function<double>()
@@ -105,59 +108,120 @@ namespace Hermes
       Transformable::set_active_element(e);
     }
 
-    Func<double>* PrecalcShapeset::calculate(double3* xy, int np) const
+    void PrecalcShapeset::calculate(uint64_t sub_idx, double3* xy, int np, int index, Hermes::Hermes2D::ElementMode2D mode)
     {
-      Func<double>* u = new Func<double>(np, this->num_components);
+      Values* values;
+      if(sub_idx == 0)
+        this->zero_sub_idx_table[index] = values = new Values;
+      else
+        this->sub_idx_tables.find(sub_idx)->second[index] = values = new Values;
+
       SpaceType space_type = this->get_space_type();
 
       if(space_type == HERMES_H1_SPACE || space_type == HERMES_L2_SPACE)
       {
-        u->val = new double[np];
-        u->dx  = new double[np];
-        u->dy  = new double[np];
+        values->values[0][0] = new double[np];
+        values->values[0][1] = new double[np];
+        values->values[0][2] = new double[np];
 
         for (int i = 0; i < np; i++)
         {
-          u->val[i] = shapeset->get_value(0, this->index, xy[i][0], xy[i][1], 0, element->get_mode());
-          u->dx[i] = shapeset->get_value(1, this->index, xy[i][0], xy[i][1], 0, element->get_mode());
-          u->dy[i] = shapeset->get_value(2, this->index, xy[i][0], xy[i][1], 0, element->get_mode());
+          values->values[0][0][i] = shapeset->get_value(0, this->index, xy[i][0], xy[i][1], 0, mode);
+          values->values[0][1][i] = shapeset->get_value(1, this->index, xy[i][0], xy[i][1], 0, mode);
+          values->values[0][2][i] = shapeset->get_value(2, this->index, xy[i][0], xy[i][1], 0, mode);
         }
       }
       else if(space_type == HERMES_HCURL_SPACE)
       {
-        u->val0 = new double[np];
-        u->val1 = new double[np];
-        u->dx1 = new double[np];
-        u->dy0 = new double[np];
-        u->curl = new double[np];
+        values->values[0][0] = new double[np];
+        values->values[1][0] = new double[np];
+        values->values[1][1] = new double[np];
+        values->values[0][2] = new double[np];
 
         for (int i = 0; i < np; i++)
         {
-          u->val0[i] = shapeset->get_value(0, this->index, xy[i][0], xy[i][1], 0, element->get_mode());
-          u->val1[i] = shapeset->get_value(0, this->index, xy[i][0], xy[i][1], 1, element->get_mode());
-          u->dx1[i] = shapeset->get_value(1, this->index, xy[i][0], xy[i][1], 1, element->get_mode());
-          u->dy0[i] = shapeset->get_value(2, this->index, xy[i][0], xy[i][1], 0, element->get_mode());
+          values->values[0][0][i] = shapeset->get_value(0, this->index, xy[i][0], xy[i][1], 0, mode);
+          values->values[1][0][i] = shapeset->get_value(0, this->index, xy[i][0], xy[i][1], 1, mode);
+          values->values[1][1][i] = shapeset->get_value(1, this->index, xy[i][0], xy[i][1], 1, mode);
+          values->values[0][2][i] = shapeset->get_value(2, this->index, xy[i][0], xy[i][1], 0, mode);
         }
       }
       // Hdiv space.
       else if(space_type == HERMES_HDIV_SPACE)
       {
-        u->val0 = new double[np];
-        u->val1 = new double[np];
-        u->dx0 = new double[np];
-        u->dy1 = new double[np];
-        u->div = new double[np];
+        values->values[0][0] = new double[np];
+        values->values[1][0] = new double[np];
+        values->values[0][1] = new double[np];
+        values->values[1][2] = new double[np];
 
         for (int i = 0; i < np; i++)
         {
-          u->val0[i] = shapeset->get_value(0, this->index, xy[i][0], xy[i][1], 0, element->get_mode());
-          u->val1[i] = shapeset->get_value(0, this->index, xy[i][0], xy[i][1], 1, element->get_mode());
-          u->dx0[i] = shapeset->get_value(1, this->index, xy[i][0], xy[i][1], 0, element->get_mode());
-          u->dy1[i] = shapeset->get_value(2, this->index, xy[i][0], xy[i][1], 1, element->get_mode());
+          values->values[0][0][i] = shapeset->get_value(0, this->index, xy[i][0], xy[i][1], 0, mode);
+          values->values[1][0][i] = shapeset->get_value(0, this->index, xy[i][0], xy[i][1], 1, mode);
+          values->values[0][1][i] = shapeset->get_value(1, this->index, xy[i][0], xy[i][1], 0, mode);
+          values->values[1][2][i] = shapeset->get_value(2, this->index, xy[i][0], xy[i][1], 1, mode);
         }
       }
+    }
 
-      return u;
+    template<typename Scalar>
+    Func<double>** PrecalcShapeset::transform_values(double2x2* inv_ref_map, uint64_t sub_idx, int np, AsmList<Scalar>* al)
+    {
+      Func<double>** newFunc = new Func<double>*[al->cnt];
+      for(int i = 0; i < al->cnt; i++)
+        newFunc[i] = new Func<double>(np, this->get_num_components());
+      Values** values;
+      if(sub_idx == 0)
+        values = this->zero_sub_idx_table;
+      else
+        values = this->sub_idx_tables.find(sub_idx)->second;
+
+      SpaceType space_type = this->get_space_type();
+      for (int i = 0; i < np; i++, inv_ref_map++)
+      {
+        for(int j = 0; j < al->cnt; j++)
+        {
+          if(space_type == HERMES_H1_SPACE || space_type == HERMES_L2_SPACE)
+          {
+            memcpy(newFunc[j]->val, values[al->idx[j]]->values[0][0], np * sizeof(double));
+            newFunc[j]->dx = new double[np];
+            newFunc[j]->dy = new double[np];
+
+            for (int i = 0; i < np; i++, inv_ref_map++)
+            {
+              newFunc[j]->dx[i] = (values[al->idx[j]]->values[0][1][i] * (*inv_ref_map)[0][0] + values[al->idx[j]]->values[0][2][i] * (*inv_ref_map)[0][1]);
+              newFunc[j]->dy[i] = (values[al->idx[j]]->values[0][1][i] * (*inv_ref_map)[1][0] + values[al->idx[j]]->values[0][2][i] * (*inv_ref_map)[1][1]);
+            }
+          }
+          else if(space_type == HERMES_HCURL_SPACE)
+          {
+            memcpy(newFunc[j]->val0, values[al->idx[j]]->values[0][0], sizeof(double) * np);
+            memcpy(newFunc[j]->val1, values[al->idx[j]]->values[1][0], sizeof(double) * np);
+            newFunc[j]->curl = new double[np];
+
+            for (int i = 0; i < np; i++, inv_ref_map++)
+            {
+              newFunc[j]->val0[i] = (values[al->idx[j]]->values[0][0][i] * (*inv_ref_map)[0][0] + values[al->idx[j]]->values[1][0][i] * (*inv_ref_map)[0][1]);
+              newFunc[j]->val1[i] = (values[al->idx[j]]->values[0][0][i] * (*inv_ref_map)[1][0] + values[al->idx[j]]->values[1][0][i] * (*inv_ref_map)[1][1]);
+              newFunc[j]->curl[i] = ((*inv_ref_map)[0][0] * (*inv_ref_map)[1][1] - (*inv_ref_map)[1][0] * (*inv_ref_map)[0][1]) * (values[al->idx[j]]->values[1][1][i] - values[al->idx[j]]->values[0][2][i]);
+            }
+          }
+          else if(space_type == HERMES_HDIV_SPACE)
+          {
+            memcpy(newFunc[j]->val0, values[al->idx[j]]->values[0][0], sizeof(double) * np);
+            memcpy(newFunc[j]->val1, values[al->idx[j]]->values[1][0], sizeof(double) * np);
+            newFunc[j]->div = new double[np];
+
+            for (int i = 0; i < np; i++, inv_ref_map++)
+            {
+              newFunc[j]->val0[i] = (values[al->idx[j]]->values[0][0][i] * (*inv_ref_map)[0][0] - values[al->idx[j]]->values[1][0][i] * (*inv_ref_map)[0][1]);
+              newFunc[j]->val1[i] = (- values[al->idx[j]]->values[0][0][i] * (*inv_ref_map)[1][0] + values[al->idx[j]]->values[1][0][i] * (*inv_ref_map)[1][1]);
+              newFunc[j]->div[i] = ((*inv_ref_map)[0][0] * (*inv_ref_map)[1][1] - (*inv_ref_map)[1][0] * (*inv_ref_map)[0][1]) * (values[al->idx[j]]->values[0][1][i] + values[al->idx[j]]->values[1][2][i]);
+            }
+          }
+        }
+      } 
+      return newFunc;
     }
 
     void PrecalcShapeset::precalculate(int order, int mask)
@@ -284,5 +348,8 @@ namespace Hermes
       this->sub_idx = sub_idx;
       this->ctm = ctm;
     }
+
+    template HERMES_API Func<double>** PrecalcShapeset::transform_values<double>(double2x2* inv_ref_map, uint64_t sub_idx, int np, AsmList<double>* al);;
+    template HERMES_API Func<double>** PrecalcShapeset::transform_values<std::complex<double> >(double2x2* inv_ref_map, uint64_t sub_idx, int np, AsmList<std::complex<double> >* al);;
   }
 }

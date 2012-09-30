@@ -35,52 +35,6 @@ namespace Hermes
     }
 
     template<typename T>
-    Func<T>* Func<T>::transform(double2x2* inv_ref_map)
-    {
-      Func<T>* newFunc = new Func<T>(this->num_gip, this->nc);
-      if(this->dx != NULL)
-      {
-        memcpy(newFunc->val, this->val, this->num_gip * sizeof(T));
-        newFunc->dx = new T[this->num_gip];
-        newFunc->dy = new T[this->num_gip];
-
-        for (int i = 0; i < this->num_gip; i++, inv_ref_map++)
-        {
-          newFunc->dx[i] = (this->dx[i] * (*inv_ref_map)[0][0] + this->dy[i] * (*inv_ref_map)[0][1]);
-          newFunc->dy[i] = (this->dx[i] * (*inv_ref_map)[1][0] + this->dy[i] * (*inv_ref_map)[1][1]);
-        }
-      }
-      if(this->curl != NULL)
-      {
-        memcpy(newFunc->val0, this->val0, sizeof(T) * this->num_gip);
-        memcpy(newFunc->val1, this->val1, sizeof(T) * this->num_gip);
-        newFunc->curl = new T[this->num_gip];
-
-        for (int i = 0; i < this->num_gip; i++, inv_ref_map++)
-        {
-          newFunc->val0[i] = (newFunc->val0[i] * (*inv_ref_map)[0][0] + newFunc->val1[i] * (*inv_ref_map)[0][1]);
-          newFunc->val1[i] = (newFunc->val0[i] * (*inv_ref_map)[1][0] + newFunc->val1[i] * (*inv_ref_map)[1][1]);
-          newFunc->curl[i] = ((*inv_ref_map)[0][0] * (*inv_ref_map)[1][1] - (*inv_ref_map)[1][0] * (*inv_ref_map)[0][1]) * (this->dx1[i] - this->dy0[i]);
-        }
-      }
-      if(this->div != NULL)
-      {
-        memcpy(newFunc->val0, this->val0, sizeof(T) * this->num_gip);
-        memcpy(newFunc->val1, this->val1, sizeof(T) * this->num_gip);
-        newFunc->div = new T[this->num_gip];
-
-        for (int i = 0; i < this->num_gip; i++, inv_ref_map++)
-        {
-          newFunc->val0[i] = (this->val0[i] * (*inv_ref_map)[0][0] - this->val1[i] * (*inv_ref_map)[0][1]);
-          newFunc->val1[i] = (- this->val0[i] * (*inv_ref_map)[1][0] + this->val1[i] * (*inv_ref_map)[1][1]);
-          newFunc->div[i] = ((*inv_ref_map)[0][0] * (*inv_ref_map)[1][1] - (*inv_ref_map)[1][0] * (*inv_ref_map)[0][1]) * (this->dx0[i] + this->dy1[i]);
-        }
-      }
-      return newFunc;
-    }
-
-
-    template<typename T>
     void Func<T>::subtract(const Func<T>& func)
     {
       if(num_gip != func.num_gip)

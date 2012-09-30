@@ -114,6 +114,33 @@ namespace Hermes
       sub_idx = (sub_idx << 3) + son + 1; // see traverse.cpp if this changes
     }
 
+    void Transformable::get_transformation_matrix(Hermes::Hermes2D::ElementMode2D mode, uint64_t sub_idx, double2 matrix, double2 translation)
+    {
+      int son[25];
+      int i = 0;
+      while (sub_idx > 0)
+      {
+        son[i++] = (sub_idx - 1) & 7;
+        sub_idx = (sub_idx - 1) >> 3;
+      }
+      matrix[0] = matrix[1] = 1.0;
+      translation[0] = translation[1] = 0.0;
+      for (int k = i-1; k >= 0; k--)
+      {
+        Trf* tr = (mode == HERMES_MODE_TRIANGLE ? tri_trf + son[k] : quad_trf + son[k]);
+
+        double m0 = matrix[0] * tr->m[0];
+        double m1 = matrix[1] * tr->m[1];
+        double t0 = matrix[0] * tr->t[0] + translation[0];
+        double t1 = matrix[1] * tr->t[1] + translation[1];
+
+        matrix[0] = m0;
+        matrix[1] = m1;
+        translation[0] = t0;
+        translation[1] = t1;
+      }
+    }
+
     void Transformable::push_transforms(std::set<Transformable *>& transformables, int son)
     {
       for(std::set<Transformable *>::iterator it = transformables.begin(); it != transformables.end(); ++it)

@@ -18,6 +18,7 @@
 
 #include "../function/function.h"
 #include "../shapeset/shapeset.h"
+#include "../asmlist.h"
 
 namespace Hermes
 {
@@ -107,14 +108,28 @@ namespace Hermes
       class Values
       {
       public:
-        double values[2][6];
+        Values() 
+        {
+          for(int i = 0; i < 2; i++)
+            for(int j = 0; j < 6; j++)
+              values[i][j] = NULL;
+        };
+        ~Values()
+        {
+          for(int i = 0; i < 2; i++)
+            for(int j = 0; j < 6; j++)
+              if(values[i][j] != NULL)
+                delete values[i][j];
+        };
+        double* values[2][6];
       };
       
       Values** zero_sub_idx_table;
 
       std::map<uint64_t, Values**> sub_idx_tables;
 
-      Func<double>** transform_values(double2x2* inv_ref_map, uint64_t sub_idx, int np);
+      template<typename Scalar>
+      Func<double>** transform_values(double2x2* inv_ref_map, uint64_t sub_idx, int np, AsmList<Scalar>* al);
 
       int index;
 
@@ -127,7 +142,7 @@ namespace Hermes
 
       virtual void precalculate(int order, int mask);
 
-      void calculate(uint64_t sub_idx, double3* xy, int np, int index) const;
+      void calculate(uint64_t sub_idx, double3* xy, int np, int index, Hermes::Hermes2D::ElementMode2D mode);
 
       void update_max_index();
 

@@ -57,6 +57,7 @@ namespace Hermes
 
       /// Internal. Enlarges the storage capacity.
       void enlarge();
+      friend class PrecalcShapeset;
       template<typename T> friend class DiscreteProblem;
       template<typename T> friend class DiscreteProblemLinear;
       template<typename T> friend class NeighborSearch;

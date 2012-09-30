@@ -123,7 +123,7 @@ namespace Hermes
       virtual Scalar get_pt_value(double x, double y, int item = H2D_FN_VAL_0);
 
     protected:
-      virtual Func<Scalar>* calculate(double* x_phys, double* y_phys, double* x_ref, double* y_ref, int np, double2x2* inv_ref_map);
+      virtual Func<Scalar>* calculate(int element_id, double* x_phys, double* y_phys, double* x_ref, double* y_ref, int np, double2x2* inv_ref_map);
 
       int item[10];
 
@@ -143,7 +143,7 @@ namespace Hermes
       ComplexFilter(MeshFunction<std::complex<double> >* solution, int item = H2D_FN_VAL_0);
 
     protected:
-      virtual Func<double>* calculate(double* x_phys, double* y_phys, double* x_ref, double* y_ref, int np);
+      virtual Func<double>* calculate(int element_id, double* x_phys, double* y_phys, double* x_ref, double* y_ref, int np, double2x2* inv_ref_map);
 
       virtual double get_pt_value(double x, double y, int item = H2D_FN_VAL_0);
 
@@ -386,7 +386,7 @@ namespace Hermes
       virtual MeshFunction<double>* clone();
 
     protected:
-      virtual Func<double>* calculate(double* x_phys, double* y_phys, double* x_ref, double* y_ref, int np);
+      virtual Func<double>* calculate(int element_id, double* x_phys, double* y_phys, double* x_ref, double* y_ref, int np, double2x2* inv_ref_map);
       
       double lambda, mu;
 

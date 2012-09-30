@@ -204,13 +204,7 @@ namespace Hermes
       /// weighting of matrix blocks in systems.
       void create_sparse_structure();
       void create_sparse_structure(SparseMatrix<Scalar>* mat, Vector<Scalar>* rhs = NULL);
-
       
-      /// \ingroup Helper methods inside {calc_order_*, assemble_*}
-      /// Init geometry, jacobian * weights, return the number of integration points.
-      int init_geometry_points(RefMap* reference_mapping, int order, Geom<double>*& geometry, double*& jacobian_x_weights);
-      int init_surface_geometry_points(RefMap* reference_mapping, int& order, Traverse::State* current_state, Geom<double>*& geometry, double*& jacobian_x_weights);
-
       /// Matrix structure as well as spaces and weak formulation is up-to-date.
       bool is_up_to_date() const;
 
@@ -268,7 +262,6 @@ namespace Hermes
       class CacheRecord
       {
       public:
-        void clear();
         Geom<double>* geometry;
         Geom<double>** geometry_surf;
         double* jacobian_x_weights;
@@ -295,6 +288,8 @@ namespace Hermes
 
 
       ///* DG *///
+
+      int init_surface_geometry_points(RefMap* reference_mapping, int& order, Traverse::State* current_state, Geom<double>*& geometry, double*& jacobian_x_weights);
 
       /// Assemble DG forms.
       void assemble_one_DG_state(PrecalcShapeset** current_pss, PrecalcShapeset** current_spss, RefMap** current_refmaps, Solution<Scalar>** current_u_ext, AsmList<Scalar>** current_als,

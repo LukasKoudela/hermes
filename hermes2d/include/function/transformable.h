@@ -58,6 +58,9 @@ namespace Hermes
       /// \param idx[in] The number of the sub-element, as returned by get_transform().
       void set_transform(uint64_t idx);
 
+      /// Static - returns the transformation matrix and rhs for the current sub-element mapping parameter.
+      static void get_transformation_matrix(Hermes::Hermes2D::ElementMode2D mode, uint64_t sub_idx, double2 matrix, double2 translation);
+
       /// \return The current transform index.
       uint64_t get_transform() const;
 
