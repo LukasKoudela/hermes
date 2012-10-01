@@ -108,14 +108,57 @@ namespace Hermes
       Transformable::set_active_element(e);
     }
 
-    void PrecalcShapeset::calculate(uint64_t sub_idx, double3* xy, int np, int index, Hermes::Hermes2D::ElementMode2D mode)
+    void PrecalcShapeset::calculate(uint64_t sub_idx, double3* xy, int np, int shape_fn_index, Hermes::Hermes2D::ElementMode2D mode)
     {
       Values* values;
       if(sub_idx == 0)
-        this->zero_sub_idx_table[index] = values = new Values;
+      {
+        if(shape_fn_index >= 0)
+          this->zero_sub_idx_table[shape_fn_index] = values = new Values;
+        else
+        {
+          std::map<int, Values*>::iterator it = this->zero_sub_idx_constrained_table.find(shape_fn_index);
+          if(it == this->zero_sub_idx_constrained_table.end())
+          {
+            values = new Values;
+            this->zero_sub_idx_constrained_table.insert(std::make_pair<int, Values*>(shape_fn_index, values));
+          }
+          else
+            values = it->second;
+        }
+      }
       else
-        this->sub_idx_tables.find(sub_idx)->second[index] = values = new Values;
+      {
+        if(shape_fn_index >= 0)
+          this->sub_idx_tables.find(sub_idx)->second[shape_fn_index] = values = new Values;
+        else
+        {
+          std::map<int, Values*>::iterator it = this->sub_idx_constrained_tables.find(sub_idx)->second.find(shape_fn_index);
+          if(it == this->sub_idx_constrained_tables.find(sub_idx)->second.end())
+          {
+            values = new Values;
+            this->sub_idx_constrained_tables.find(sub_idx)->second.insert(std::make_pair<int, Values*>(shape_fn_index, values));
+          }
+          else
+            values = it->second;
+        }
+      }
 
+      double* x_ref_sub_idx;
+      double* y_ref_sub_idx;
+      if(sub_idx != 0)
+      {
+        x_ref_sub_idx = new double[np];
+        y_ref_sub_idx = new double[np];
+        double2 sub_element_matrix;
+        double2 sub_element_translation;
+        Transformable::get_transformation_matrix(mode, sub_idx, sub_element_matrix, sub_element_translation);
+        for(unsigned int i = 0; i < np; i++)
+        {
+          x_ref_sub_idx[i] = xy[i][0] * sub_element_matrix[0] + sub_element_translation[0];
+          y_ref_sub_idx[i] = xy[i][1] * sub_element_matrix[1] + sub_element_translation[1];
+        }
+      }
       SpaceType space_type = this->get_space_type();
 
       if(space_type == HERMES_H1_SPACE || space_type == HERMES_L2_SPACE)
@@ -124,12 +167,20 @@ namespace Hermes
         values->values[0][1] = new double[np];
         values->values[0][2] = new double[np];
 
-        for (int i = 0; i < np; i++)
-        {
-          values->values[0][0][i] = shapeset->get_value(0, this->index, xy[i][0], xy[i][1], 0, mode);
-          values->values[0][1][i] = shapeset->get_value(1, this->index, xy[i][0], xy[i][1], 0, mode);
-          values->values[0][2][i] = shapeset->get_value(2, this->index, xy[i][0], xy[i][1], 0, mode);
-        }
+        if(sub_idx == 0)
+          for (int i = 0; i < np; i++)
+          {
+            values->values[0][0][i] = shapeset->get_value(0, shape_fn_index, xy[i][0], xy[i][1], 0, mode);
+            values->values[0][1][i] = shapeset->get_value(1, shape_fn_index, xy[i][0], xy[i][1], 0, mode);
+            values->values[0][2][i] = shapeset->get_value(2, shape_fn_index, xy[i][0], xy[i][1], 0, mode);
+          }
+        else
+          for (int i = 0; i < np; i++)
+          {
+            values->values[0][0][i] = shapeset->get_value(0, shape_fn_index, x_ref_sub_idx[i], y_ref_sub_idx[i], 0, mode);
+            values->values[0][1][i] = shapeset->get_value(1, shape_fn_index, x_ref_sub_idx[i], y_ref_sub_idx[i], 0, mode);
+            values->values[0][2][i] = shapeset->get_value(2, shape_fn_index, x_ref_sub_idx[i], y_ref_sub_idx[i], 0, mode);
+          }
       }
       else if(space_type == HERMES_HCURL_SPACE)
       {
@@ -138,13 +189,22 @@ namespace Hermes
         values->values[1][1] = new double[np];
         values->values[0][2] = new double[np];
 
-        for (int i = 0; i < np; i++)
-        {
-          values->values[0][0][i] = shapeset->get_value(0, this->index, xy[i][0], xy[i][1], 0, mode);
-          values->values[1][0][i] = shapeset->get_value(0, this->index, xy[i][0], xy[i][1], 1, mode);
-          values->values[1][1][i] = shapeset->get_value(1, this->index, xy[i][0], xy[i][1], 1, mode);
-          values->values[0][2][i] = shapeset->get_value(2, this->index, xy[i][0], xy[i][1], 0, mode);
-        }
+        if(sub_idx == 0)
+          for (int i = 0; i < np; i++)
+          {
+            values->values[0][0][i] = shapeset->get_value(0, shape_fn_index, xy[i][0], xy[i][1], 0, mode);
+            values->values[1][0][i] = shapeset->get_value(0, shape_fn_index, xy[i][0], xy[i][1], 1, mode);
+            values->values[1][1][i] = shapeset->get_value(1, shape_fn_index, xy[i][0], xy[i][1], 1, mode);
+            values->values[0][2][i] = shapeset->get_value(2, shape_fn_index, xy[i][0], xy[i][1], 0, mode);
+          }
+        else
+          for (int i = 0; i < np; i++)
+          {
+            values->values[0][0][i] = shapeset->get_value(0, shape_fn_index, x_ref_sub_idx[i], y_ref_sub_idx[i], 0, mode);
+            values->values[1][0][i] = shapeset->get_value(0, shape_fn_index, x_ref_sub_idx[i], y_ref_sub_idx[i], 1, mode);
+            values->values[1][1][i] = shapeset->get_value(1, shape_fn_index, x_ref_sub_idx[i], y_ref_sub_idx[i], 1, mode);
+            values->values[0][2][i] = shapeset->get_value(2, shape_fn_index, x_ref_sub_idx[i], y_ref_sub_idx[i], 0, mode);
+          }
       }
       // Hdiv space.
       else if(space_type == HERMES_HDIV_SPACE)
@@ -154,13 +214,22 @@ namespace Hermes
         values->values[0][1] = new double[np];
         values->values[1][2] = new double[np];
 
+        if(sub_idx == 0)
         for (int i = 0; i < np; i++)
         {
-          values->values[0][0][i] = shapeset->get_value(0, this->index, xy[i][0], xy[i][1], 0, mode);
-          values->values[1][0][i] = shapeset->get_value(0, this->index, xy[i][0], xy[i][1], 1, mode);
-          values->values[0][1][i] = shapeset->get_value(1, this->index, xy[i][0], xy[i][1], 0, mode);
-          values->values[1][2][i] = shapeset->get_value(2, this->index, xy[i][0], xy[i][1], 1, mode);
+          values->values[0][0][i] = shapeset->get_value(0, shape_fn_index, xy[i][0], xy[i][1], 0, mode);
+          values->values[1][0][i] = shapeset->get_value(0, shape_fn_index, xy[i][0], xy[i][1], 1, mode);
+          values->values[0][1][i] = shapeset->get_value(1, shape_fn_index, xy[i][0], xy[i][1], 0, mode);
+          values->values[1][2][i] = shapeset->get_value(2, shape_fn_index, xy[i][0], xy[i][1], 1, mode);
         }
+        else
+          for (int i = 0; i < np; i++)
+          {
+            values->values[0][0][i] = shapeset->get_value(0, shape_fn_index, x_ref_sub_idx[i], y_ref_sub_idx[i], 0, mode);
+            values->values[1][0][i] = shapeset->get_value(0, shape_fn_index, x_ref_sub_idx[i], y_ref_sub_idx[i], 1, mode);
+            values->values[0][1][i] = shapeset->get_value(1, shape_fn_index, x_ref_sub_idx[i], y_ref_sub_idx[i], 0, mode);
+            values->values[1][2][i] = shapeset->get_value(2, shape_fn_index, x_ref_sub_idx[i], y_ref_sub_idx[i], 1, mode);
+          }
       }
     }
 
@@ -171,18 +240,26 @@ namespace Hermes
       for(int i = 0; i < al->cnt; i++)
         newFunc[i] = new Func<double>(np, this->get_num_components());
       Values** values;
+      std::map<int, Values*>* values_constrained;
       if(sub_idx == 0)
+      {
         values = this->zero_sub_idx_table;
+        values_constrained = &this->zero_sub_idx_constrained_table;
+      }
       else
+      {
         values = this->sub_idx_tables.find(sub_idx)->second;
+        values_constrained = &(this->sub_idx_constrained_tables.find(sub_idx)->second);
+      }
 
       SpaceType space_type = this->get_space_type();
-      for (int i = 0; i < np; i++, inv_ref_map++)
+      for(int j = 0; j < al->cnt; j++)
       {
-        for(int j = 0; j < al->cnt; j++)
+        if(al->idx[j] >= 0)
         {
           if(space_type == HERMES_H1_SPACE || space_type == HERMES_L2_SPACE)
           {
+            newFunc[j]->val = new double[np];
             memcpy(newFunc[j]->val, values[al->idx[j]]->values[0][0], np * sizeof(double));
             newFunc[j]->dx = new double[np];
             newFunc[j]->dy = new double[np];
@@ -195,6 +272,8 @@ namespace Hermes
           }
           else if(space_type == HERMES_HCURL_SPACE)
           {
+            newFunc[j]->val0 = new double[np];
+            newFunc[j]->val1 = new double[np];
             memcpy(newFunc[j]->val0, values[al->idx[j]]->values[0][0], sizeof(double) * np);
             memcpy(newFunc[j]->val1, values[al->idx[j]]->values[1][0], sizeof(double) * np);
             newFunc[j]->curl = new double[np];
@@ -208,6 +287,8 @@ namespace Hermes
           }
           else if(space_type == HERMES_HDIV_SPACE)
           {
+            newFunc[j]->val0 = new double[np];
+            newFunc[j]->val1 = new double[np];
             memcpy(newFunc[j]->val0, values[al->idx[j]]->values[0][0], sizeof(double) * np);
             memcpy(newFunc[j]->val1, values[al->idx[j]]->values[1][0], sizeof(double) * np);
             newFunc[j]->div = new double[np];
@@ -220,6 +301,53 @@ namespace Hermes
             }
           }
         }
+        else
+        {
+          if(space_type == HERMES_H1_SPACE || space_type == HERMES_L2_SPACE)
+          {
+            newFunc[j]->val = new double[np];
+            memcpy(newFunc[j]->val, values_constrained->find(al->idx[j])->second->values[0][0], np * sizeof(double));
+            newFunc[j]->dx = new double[np];
+            newFunc[j]->dy = new double[np];
+
+            for (int i = 0; i < np; i++, inv_ref_map++)
+            {
+              newFunc[j]->dx[i] = (values_constrained->find(al->idx[j])->second->values[0][1][i] * (*inv_ref_map)[0][0] + values_constrained->find(al->idx[j])->second->values[0][2][i] * (*inv_ref_map)[0][1]);
+              newFunc[j]->dy[i] = (values_constrained->find(al->idx[j])->second->values[0][1][i] * (*inv_ref_map)[1][0] + values_constrained->find(al->idx[j])->second->values[0][2][i] * (*inv_ref_map)[1][1]);
+            }
+          }
+          else if(space_type == HERMES_HCURL_SPACE)
+          {
+            newFunc[j]->val0 = new double[np];
+            newFunc[j]->val1 = new double[np];
+            memcpy(newFunc[j]->val0, values_constrained->find(al->idx[j])->second->values[0][0], sizeof(double) * np);
+            memcpy(newFunc[j]->val1, values_constrained->find(al->idx[j])->second->values[1][0], sizeof(double) * np);
+            newFunc[j]->curl = new double[np];
+
+            for (int i = 0; i < np; i++, inv_ref_map++)
+            {
+              newFunc[j]->val0[i] = (values_constrained->find(al->idx[j])->second->values[0][0][i] * (*inv_ref_map)[0][0] + values_constrained->find(al->idx[j])->second->values[1][0][i] * (*inv_ref_map)[0][1]);
+              newFunc[j]->val1[i] = (values_constrained->find(al->idx[j])->second->values[0][0][i] * (*inv_ref_map)[1][0] + values_constrained->find(al->idx[j])->second->values[1][0][i] * (*inv_ref_map)[1][1]);
+              newFunc[j]->curl[i] = ((*inv_ref_map)[0][0] * (*inv_ref_map)[1][1] - (*inv_ref_map)[1][0] * (*inv_ref_map)[0][1]) * (values_constrained->find(al->idx[j])->second->values[1][1][i] - values_constrained->find(al->idx[j])->second->values[0][2][i]);
+            }
+          }
+          else if(space_type == HERMES_HDIV_SPACE)
+          {
+            newFunc[j]->val0 = new double[np];
+            newFunc[j]->val1 = new double[np];
+            memcpy(newFunc[j]->val0, values_constrained->find(al->idx[j])->second->values[0][0], sizeof(double) * np);
+            memcpy(newFunc[j]->val1, values_constrained->find(al->idx[j])->second->values[1][0], sizeof(double) * np);
+            newFunc[j]->div = new double[np];
+
+            for (int i = 0; i < np; i++, inv_ref_map++)
+            {
+              newFunc[j]->val0[i] = (values_constrained->find(al->idx[j])->second->values[0][0][i] * (*inv_ref_map)[0][0] - values_constrained->find(al->idx[j])->second->values[1][0][i] * (*inv_ref_map)[0][1]);
+              newFunc[j]->val1[i] = (- values_constrained->find(al->idx[j])->second->values[0][0][i] * (*inv_ref_map)[1][0] + values_constrained->find(al->idx[j])->second->values[1][0][i] * (*inv_ref_map)[1][1]);
+              newFunc[j]->div[i] = ((*inv_ref_map)[0][0] * (*inv_ref_map)[1][1] - (*inv_ref_map)[1][0] * (*inv_ref_map)[0][1]) * (values_constrained->find(al->idx[j])->second->values[0][1][i] + values_constrained->find(al->idx[j])->second->values[1][2][i]);
+            }
+          }
+        }
+        inv_ref_map -= np;
       } 
       return newFunc;
     }

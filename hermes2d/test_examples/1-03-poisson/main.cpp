@@ -27,8 +27,8 @@
 
 const bool HERMES_VISUALIZATION = true;           // Set to "false" to suppress Hermes OpenGL visualization.
 const bool VTK_VISUALIZATION = false;              // Set to "true" to enable VTK output.
-const int P_INIT = 5;                             // Uniform polynomial degree of mesh elements.
-const int INIT_REF_NUM = 4;                       // Number of initial uniform mesh refinements.
+const int P_INIT = 9;                             // Uniform polynomial degree of mesh elements.
+const int INIT_REF_NUM = 1;                       // Number of initial uniform mesh refinements.
 
 // Problem parameters.
 const double LAMBDA_AL = 236.0;            // Thermal cond. of Al for temperatures around 20 deg Celsius.
@@ -45,26 +45,25 @@ int main(int argc, char* argv[])
   // Load the mesh.
   Hermes::Hermes2D::Mesh mesh;
   Hermes::Hermes2D::MeshReaderH2DXML mloader;
-  mloader.load("domain.xml", &mesh);
+  mloader.load("domain2.xml", &mesh);
 
-  // Perform initial mesh refinements (optional).
-  mesh.refine_in_areas(Hermes::vector<std::string>("Aluminum", "Copper"), INIT_REF_NUM);
-  mesh.refine_in_area("Aluminum");
+  mesh.refine_all_elements();
+  mesh.refine_all_elements();
+  mesh.refine_all_elements();
 
   // Initialize the weak formulation.
   CustomWeakFormPoisson wf("Aluminum", new Hermes::Hermes1DFunction<double>(LAMBDA_AL), "Copper",
     new Hermes::Hermes1DFunction<double>(LAMBDA_CU), new Hermes::Hermes2DFunction<double>(-VOLUME_HEAT_SRC));
 
   // Initialize essential boundary conditions.
-  Hermes::Hermes2D::DefaultEssentialBCConst<double> bc_essential(Hermes::vector<std::string>("Bottom", "Inner", "Outer", "Left"),
-    FIXED_BDY_TEMP);
+  Hermes::Hermes2D::DefaultEssentialBCConst<double> bc_essential("AAA", FIXED_BDY_TEMP);
   Hermes::Hermes2D::EssentialBCs<double> bcs(&bc_essential);
 
   // Create an H1 space with default shapeset.
   Hermes::Hermes2D::H1Space<double> space(&mesh, &bcs, P_INIT);
 
   Hermes::Hermes2D::Views::BaseView<double> b;
-  //b.show(&space);
+  b.show(&space);
 
   Hermes::Hermes2D::Element* e;
 

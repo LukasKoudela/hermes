@@ -1225,8 +1225,22 @@ namespace Hermes
             if(current_state.sub_idx[space_i] == 0)
             {
               for(unsigned int index_i = 0; index_i < al.cnt; index_i++)
-              if(this->precalculated_shapesets[mode][space_i]->zero_sub_idx_table[index_i] == NULL)
-                this->precalculated_shapesets[mode][space_i]->calculate(0, g_quad_2d_std.get_points(this->integration_order, mode), this->num_integration_points[mode], al.idx[index_i], mode);
+              {
+                if(al.dof[index_i] < 0)
+                  continue;
+                if(al.idx[index_i] >= 0)
+                {
+                  if(this->precalculated_shapesets[mode][space_i]->zero_sub_idx_table[al.idx[index_i]] == NULL)
+                    this->precalculated_shapesets[mode][space_i]->calculate(0, g_quad_2d_std.get_points(this->integration_order, mode), this->num_integration_points[mode], al.idx[index_i], mode);
+                }
+                else
+                {
+                  if(this->precalculated_shapesets[mode][space_i]->zero_sub_idx_constrained_table.find(al.idx[index_i]) == this->precalculated_shapesets[mode][space_i]->zero_sub_idx_constrained_table.end())
+                  {
+                    this->precalculated_shapesets[mode][space_i]->calculate(0, g_quad_2d_std.get_points(this->integration_order, mode), this->num_integration_points[mode], al.idx[index_i], mode);
+                  }
+                }
+              }
             }
             else
             {
@@ -1245,8 +1259,28 @@ namespace Hermes
               else
                 newValues = (*it).second;
               for(unsigned int index_i = 0; index_i < al.cnt; index_i++)
-                if(newValues[index_i] == NULL)
-                  this->precalculated_shapesets[mode][space_i]->calculate(current_state.sub_idx[space_i], g_quad_2d_std.get_points(this->integration_order, mode), this->num_integration_points[mode], al.idx[index_i], mode);
+              {
+                if(al.idx[index_i] >= 0)
+                {
+                  if(newValues[al.idx[index_i]] == NULL)
+                    this->precalculated_shapesets[mode][space_i]->calculate(current_state.sub_idx[space_i], g_quad_2d_std.get_points(this->integration_order, mode), this->num_integration_points[mode], al.idx[index_i], mode);
+                }
+                else
+                {
+                  std::map<uint64_t, std::map<int, PrecalcShapeset::Values*>>::iterator itConstrained = this->precalculated_shapesets[mode][space_i]->sub_idx_constrained_tables.find(current_state.sub_idx[space_i]);
+                  std::map<int, PrecalcShapeset::Values*> newValuesConstrained;
+                  if(itConstrained == this->precalculated_shapesets[mode][space_i]->sub_idx_constrained_tables.end())
+                  {
+    #pragma omp critical(precalc_shapeset_sub_idx_new)
+                    if(this->precalculated_shapesets[mode][space_i]->sub_idx_constrained_tables.find(current_state.sub_idx[space_i]) == this->precalculated_shapesets[mode][space_i]->sub_idx_constrained_tables.end())
+                      this->precalculated_shapesets[mode][space_i]->sub_idx_constrained_tables.insert(std::make_pair<int, std::map<int, PrecalcShapeset::Values*>>(current_state.sub_idx[space_i], newValuesConstrained));
+                  }
+                  else
+                    newValuesConstrained = (*itConstrained).second;
+                  if(newValuesConstrained.find(al.idx[index_i]) == newValuesConstrained.end())
+                    this->precalculated_shapesets[mode][space_i]->calculate(current_state.sub_idx[space_i], g_quad_2d_std.get_points(this->integration_order, mode), this->num_integration_points[mode], al.idx[index_i], mode);
+                }
+              }
             }
 
             if(current_state.isBnd)
@@ -1264,8 +1298,8 @@ namespace Hermes
                   if(current_state.sub_idx[space_i] == 0)
                   {
                     for(unsigned int index_i = 0; index_i < alSurf.cnt; index_i++)
-                    if(this->precalculated_shapesets_surf[mode][current_state.isurf][space_i]->zero_sub_idx_table[index_i] == NULL)
-                      this->precalculated_shapesets_surf[mode][current_state.isurf][space_i]->calculate(0, ptsSurf, this->num_integration_points_surf[mode][current_state.isurf], alSurf.idx[index_i], mode);
+                      if(this->precalculated_shapesets_surf[mode][current_state.isurf][space_i]->zero_sub_idx_table[index_i] == NULL)
+                        this->precalculated_shapesets_surf[mode][current_state.isurf][space_i]->calculate(0, ptsSurf, this->num_integration_points_surf[mode][current_state.isurf], alSurf.idx[index_i], mode);
                   }
                   else
                   {
@@ -1284,8 +1318,28 @@ namespace Hermes
                     else
                       newValues = (*it).second;
                     for(unsigned int index_i = 0; index_i < alSurf.cnt; index_i++)
-                      if(newValues[index_i] == NULL)
-                        this->precalculated_shapesets_surf[mode][current_state.isurf][space_i]->calculate(current_state.sub_idx[space_i], ptsSurf, this->num_integration_points_surf[mode][current_state.isurf], alSurf.idx[index_i], mode);
+                    {
+                      if(al.idx[index_i] >= 0)
+                      {
+                        if(newValues[al.idx[index_i]] == NULL)
+                          this->precalculated_shapesets_surf[mode][current_state.isurf][space_i]->calculate(current_state.sub_idx[space_i], ptsSurf, this->num_integration_points_surf[mode][current_state.isurf], alSurf.idx[index_i], mode);
+                      }
+                      else
+                      {
+                        std::map<uint64_t, std::map<int, PrecalcShapeset::Values*>>::iterator itConstrained = this->precalculated_shapesets_surf[mode][current_state.isurf][space_i]->sub_idx_constrained_tables.find(current_state.sub_idx[space_i]);
+                        std::map<int, PrecalcShapeset::Values*> newValuesConstrained;
+                        if(itConstrained == this->precalculated_shapesets_surf[mode][current_state.isurf][space_i]->sub_idx_constrained_tables.end())
+                        {
+          #pragma omp critical(precalc_shapeset_sub_idx_new)
+                          if(this->precalculated_shapesets_surf[mode][current_state.isurf][space_i]->sub_idx_constrained_tables.find(current_state.sub_idx[space_i]) == this->precalculated_shapesets_surf[mode][current_state.isurf][space_i]->sub_idx_constrained_tables.end())
+                            this->precalculated_shapesets_surf[mode][current_state.isurf][space_i]->sub_idx_constrained_tables.insert(std::make_pair<int, std::map<int, PrecalcShapeset::Values*>>(current_state.sub_idx[space_i], newValuesConstrained));
+                        }
+                        else
+                          newValuesConstrained = (*itConstrained).second;
+                        if(newValuesConstrained.find(al.idx[index_i]) == newValuesConstrained.end())
+                          this->precalculated_shapesets_surf[mode][current_state.isurf][space_i]->calculate(current_state.sub_idx[space_i], ptsSurf, this->num_integration_points_surf[mode][current_state.isurf], alSurf.idx[index_i], mode);
+                      }
+                    }
                   }
                 }
               }
@@ -1544,15 +1598,15 @@ namespace Hermes
           newRecord->jacobian_x_weights[i] = pt[i][2] * jac[i];
         }
       }
-      if(!refmap.is_jacobian_const())
-        delete [] jac;
 
       for(unsigned int space_i = 0; space_i < this->spaces.size(); space_i++)
       {
         if(current_state->e[space_i] == NULL)
           continue;
         RefMap rm(current_state->e[space_i], 0);
-        newRecord->inv_ref_map[space_i] = rm.get_inv_ref_map(this->integration_order);
+        double2x2* inv_ref_map = rm.get_inv_ref_map(this->integration_order);
+        newRecord->inv_ref_map[space_i] = new double2x2[np];
+        memcpy(newRecord->inv_ref_map[space_i], inv_ref_map, sizeof(double2x2) * np);
       }
 
       if(current_state->isBnd)
@@ -1576,7 +1630,9 @@ namespace Hermes
               if(current_state->e[space_i] == NULL)
                 continue;
               RefMap rm(current_state->e[space_i], 0);
-              newRecord->inv_ref_map[space_i] = rm.get_inv_ref_map(eo);
+              double2x2* inv_ref_map = rm.get_inv_ref_map(eo);
+              newRecord->inv_ref_map_surf[current_state->isurf][space_i] = new double2x2[npSurf];
+              memcpy(newRecord->inv_ref_map_surf[current_state->isurf][space_i], inv_ref_map, sizeof(double2x2) * npSurf);
             }
           }
       }
@@ -1603,7 +1659,6 @@ namespace Hermes
       // u_ext
       if(u_ext != NULL)
       {
-        u_ext_funcs = new Func<Scalar>*[this->spaces.size()];
         for(unsigned int space_i = 0; space_i < this->spaces.size(); space_i++)
         {
           if(current_state->sub_idx[space_i] == 0)
@@ -1626,7 +1681,6 @@ namespace Hermes
       }
       if(!ext.empty())
       {
-        ext_funcs = new Func<Scalar>*[current_state->num];
         for(std::set<MeshFunction<Scalar>*>::iterator it = ext.begin(); it != ext.end(); it++)
         {
           if(current_state->sub_idx[(*it)->assemblyTraverseOrder] == 0 || (dynamic_cast<Solution<Scalar>*>((*it)) != NULL && dynamic_cast<Solution<Scalar>*>((*it))->sln_type != HERMES_SLN))
@@ -1651,73 +1705,70 @@ namespace Hermes
       // Surface.
       if(current_state->isBnd)
       {
-        if(u_ext != NULL || !ext.empty())
+        for (current_state->isurf = 0; current_state->isurf < current_state->rep->nvert; current_state->isurf++)
         {
-          for (current_state->isurf = 0; current_state->isurf < current_state->rep->nvert; current_state->isurf++)
-          {
-            if(!is_natural_bnd_condition[current_state->isurf])
-              continue;
+          if(!is_natural_bnd_condition[current_state->isurf])
+            continue;
 
-            int surfOrder = this->integration_order;
+          int surfOrder = this->integration_order;
 
-            surfOrder = g_quad_2d_std.get_edge_points(current_state->isurf, surfOrder, mode);
-            double3* xy_ref_surf = g_quad_2d_std.get_points(surfOrder, mode);
+          surfOrder = g_quad_2d_std.get_edge_points(current_state->isurf, surfOrder, mode);
+          double3* xy_ref_surf = g_quad_2d_std.get_points(surfOrder, mode);
               
-            double* x_ref = new double[this->num_integration_points_surf[mode][current_state->isurf]];
-            double* y_ref = new double[this->num_integration_points_surf[mode][current_state->isurf]];
-            for(unsigned int i = 0; i < this->num_integration_points_surf[mode][current_state->isurf]; i++)
-            {
-              x_ref[i] = xy_ref[i][0];
-              y_ref[i] = xy_ref[i][1];
-            }
-            double* x_phys = cache_record->geometry_surf[current_state->isurf]->x;
-            double* y_phys = cache_record->geometry_surf[current_state->isurf]->y;
+          double* x_ref = new double[this->num_integration_points_surf[mode][current_state->isurf]];
+          double* y_ref = new double[this->num_integration_points_surf[mode][current_state->isurf]];
+          for(unsigned int i = 0; i < this->num_integration_points_surf[mode][current_state->isurf]; i++)
+          {
+            x_ref[i] = xy_ref[i][0];
+            y_ref[i] = xy_ref[i][1];
+          }
+          double* x_phys = cache_record->geometry_surf[current_state->isurf]->x;
+          double* y_phys = cache_record->geometry_surf[current_state->isurf]->y;
         
-            // u_ext
-            if(u_ext != NULL)
+          // u_ext
+          if(u_ext != NULL)
+          {
+            u_ext_funcs_surf[current_state->isurf] = new Func<Scalar>*[this->spaces.size()];
+            for(unsigned int space_i = 0; space_i < this->spaces.size(); space_i++)
             {
-              u_ext_funcs = new Func<Scalar>*[this->spaces.size()];
-              for(unsigned int space_i = 0; space_i < this->spaces.size(); space_i++)
+              if(current_state->sub_idx[space_i] == 0)
+                u_ext_funcs_surf[current_state->isurf][space_i] = u_ext[space_i]->calculate(current_state->e[space_i]->id, x_phys, y_phys, x_ref, y_ref, this->num_integration_points_surf[mode][current_state->isurf], cache_record->inv_ref_map_surf[current_state->isurf][space_i]);
+              else
               {
-                if(current_state->sub_idx[space_i] == 0)
-                  u_ext_funcs[space_i] = u_ext[space_i]->calculate(current_state->e[space_i]->id, x_phys, y_phys, x_ref, y_ref, this->num_integration_points_surf[mode][current_state->isurf], cache_record->inv_ref_map_surf[current_state->isurf][space_i]);
-                else
+                double* x_ref_sub_idx = new double[this->num_integration_points_surf[mode][current_state->isurf]];
+                double* y_ref_sub_idx = new double[this->num_integration_points_surf[mode][current_state->isurf]];
+                double2 sub_element_matrix;
+                double2 sub_element_translation;
+                Transformable::get_transformation_matrix(mode, current_state->sub_idx[space_i], sub_element_matrix, sub_element_translation);
+                for(unsigned int i = 0; i < this->num_integration_points_surf[mode][current_state->isurf]; i++)
                 {
-                  double* x_ref_sub_idx = new double[this->num_integration_points_surf[mode][current_state->isurf]];
-                  double* y_ref_sub_idx = new double[this->num_integration_points_surf[mode][current_state->isurf]];
-                  double2 sub_element_matrix;
-                  double2 sub_element_translation;
-                  Transformable::get_transformation_matrix(mode, current_state->sub_idx[space_i], sub_element_matrix, sub_element_translation);
-                  for(unsigned int i = 0; i < this->num_integration_points_surf[mode][current_state->isurf]; i++)
-                  {
-                    x_ref_sub_idx[i] = xy_ref[i][0] * sub_element_matrix[0] + sub_element_translation[0];
-                    y_ref_sub_idx[i] = xy_ref[i][1] * sub_element_matrix[1] + sub_element_translation[1];
-                  }
-                  u_ext_funcs[space_i] = u_ext[space_i]->calculate(current_state->e[space_i]->id, x_phys, y_phys, x_ref_sub_idx, y_ref_sub_idx, this->num_integration_points_surf[mode][current_state->isurf], cache_record->inv_ref_map_surf[current_state->isurf][space_i]);
+                  x_ref_sub_idx[i] = xy_ref[i][0] * sub_element_matrix[0] + sub_element_translation[0];
+                  y_ref_sub_idx[i] = xy_ref[i][1] * sub_element_matrix[1] + sub_element_translation[1];
                 }
+                u_ext_funcs_surf[current_state->isurf][space_i] = u_ext[space_i]->calculate(current_state->e[space_i]->id, x_phys, y_phys, x_ref_sub_idx, y_ref_sub_idx, this->num_integration_points_surf[mode][current_state->isurf], cache_record->inv_ref_map_surf[current_state->isurf][space_i]);
               }
             }
-            if(!ext.empty())
+          }
+          if(!ext.empty())
+          {
+            ext_funcs_surf[current_state->isurf] = new Func<Scalar>*[current_state->num];
+            for(std::set<MeshFunction<Scalar>*>::iterator it = ext.begin(); it != ext.end(); it++)
             {
-              ext_funcs = new Func<Scalar>*[current_state->num];
-              for(std::set<MeshFunction<Scalar>*>::iterator it = ext.begin(); it != ext.end(); it++)
+              if(current_state->sub_idx[(*it)->assemblyTraverseOrder] == 0 || (dynamic_cast<Solution<Scalar>*>((*it)) != NULL && dynamic_cast<Solution<Scalar>*>((*it))->sln_type != HERMES_SLN))
+                ext_funcs_surf[current_state->isurf][(*it)->assemblyTraverseOrder] = (*it)->calculate(current_state->e[(*it)->assemblyTraverseOrder]->id, x_phys, y_phys, x_ref, y_ref, this->num_integration_points_surf[mode][current_state->isurf], cache_record->inv_ref_map_surf[current_state->isurf][(*it)->assemblyTraverseOrder]);
+              else
               {
-                if(current_state->sub_idx[(*it)->assemblyTraverseOrder] == 0 || (dynamic_cast<Solution<Scalar>*>((*it)) != NULL && dynamic_cast<Solution<Scalar>*>((*it))->sln_type != HERMES_SLN))
-                  ext_funcs[(*it)->assemblyTraverseOrder] = (*it)->calculate(current_state->e[(*it)->assemblyTraverseOrder]->id, x_phys, y_phys, x_ref, y_ref, this->num_integration_points_surf[mode][current_state->isurf], cache_record->inv_ref_map_surf[current_state->isurf][(*it)->assemblyTraverseOrder]);
-                else
+                double* x_ref_sub_idx = new double[this->num_integration_points_surf[mode][current_state->isurf]];
+                double* y_ref_sub_idx = new double[this->num_integration_points_surf[mode][current_state->isurf]];
+                double2 sub_element_matrix;
+                double2 sub_element_translation;
+                Transformable::get_transformation_matrix(mode, current_state->sub_idx[(*it)->assemblyTraverseOrder], sub_element_matrix, sub_element_translation);
+                for(unsigned int i = 0; i < this->num_integration_points_surf[mode][current_state->isurf]; i++)
                 {
-                  double* x_ref_sub_idx = new double[this->num_integration_points_surf[mode][current_state->isurf]];
-                  double* y_ref_sub_idx = new double[this->num_integration_points_surf[mode][current_state->isurf]];
-                  double2 sub_element_matrix;
-                  double2 sub_element_translation;
-                  Transformable::get_transformation_matrix(mode, current_state->sub_idx[(*it)->assemblyTraverseOrder], sub_element_matrix, sub_element_translation);
-                  for(unsigned int i = 0; i < this->num_integration_points_surf[mode][current_state->isurf]; i++)
-                  {
-                    x_ref_sub_idx[i] = xy_ref[i][0] * sub_element_matrix[0] + sub_element_translation[0];
-                    y_ref_sub_idx[i] = xy_ref[i][1] * sub_element_matrix[1] + sub_element_translation[1];
-                  }
-                  ext_funcs[(*it)->assemblyTraverseOrder] = (*it)->calculate(current_state->e[(*it)->assemblyTraverseOrder]->id, x_phys, y_phys, x_ref_sub_idx, y_ref_sub_idx, this->num_integration_points_surf[mode][current_state->isurf], cache_record->inv_ref_map_surf[current_state->isurf][(*it)->assemblyTraverseOrder]);
+                  x_ref_sub_idx[i] = xy_ref[i][0] * sub_element_matrix[0] + sub_element_translation[0];
+                  y_ref_sub_idx[i] = xy_ref[i][1] * sub_element_matrix[1] + sub_element_translation[1];
                 }
+                ext_funcs_surf[current_state->isurf][(*it)->assemblyTraverseOrder] = (*it)->calculate(current_state->e[(*it)->assemblyTraverseOrder]->id, x_phys, y_phys, x_ref_sub_idx, y_ref_sub_idx, this->num_integration_points_surf[mode][current_state->isurf], cache_record->inv_ref_map_surf[current_state->isurf][(*it)->assemblyTraverseOrder]);
               }
             }
           }
@@ -1789,11 +1840,12 @@ namespace Hermes
       }
 
       // Ext.
-      Func<Scalar>** ext_funcs;
+      Func<Scalar>** ext_funcs = new Func<Scalar>*[current_state->num];
       Func<Scalar>** ext_funcs_surf[4];
-      Func<Scalar>** u_ext_funcs;
+      Func<Scalar>** u_ext_funcs = new Func<Scalar>*[this->spaces.size()];
       Func<Scalar>** u_ext_funcs_surf[4];
-      one_state_ext_init(current_state, is_natural_bnd_condition, ext_funcs, u_ext_funcs, ext_funcs_surf, u_ext_funcs_surf, u_ext, ext, cache_record);
+      if(u_ext != NULL || !ext.empty())
+        one_state_ext_init(current_state, is_natural_bnd_condition, ext_funcs, u_ext_funcs, ext_funcs_surf, u_ext_funcs_surf, u_ext, ext, cache_record);
         
       if(current_mat != NULL)
       {
@@ -1899,7 +1951,7 @@ namespace Hermes
 
       for(unsigned int i = 0; i < this->spaces.size(); i++)
         if(current_state->e[i] != NULL)
-          delete [] assembly_lists[i];
+          delete assembly_lists[i];
       delete [] assembly_lists;
 
       if(current_state->isBnd)
@@ -1910,7 +1962,7 @@ namespace Hermes
             continue;
           for(unsigned int i = 0; i < this->spaces.size(); i++)
             if(current_state->e[i] != NULL)
-              delete [] assembly_lists_surf[current_state->isurf][i];
+              delete assembly_lists_surf[current_state->isurf][i];
           delete [] assembly_lists_surf[current_state->isurf];
         }
         delete [] assembly_lists_surf;

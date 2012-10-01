@@ -125,8 +125,10 @@ namespace Hermes
       };
       
       Values** zero_sub_idx_table;
+      std::map<int, Values*> zero_sub_idx_constrained_table;
 
       std::map<uint64_t, Values**> sub_idx_tables;
+      std::map<uint64_t, std::map<int, Values*>> sub_idx_constrained_tables;
 
       template<typename Scalar>
       Func<double>** transform_values(double2x2* inv_ref_map, uint64_t sub_idx, int np, AsmList<Scalar>* al);
