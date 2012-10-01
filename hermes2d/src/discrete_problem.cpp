@@ -1271,7 +1271,7 @@ namespace Hermes
                   std::map<int, PrecalcShapeset::Values*> newValuesConstrained;
                   if(itConstrained == this->precalculated_shapesets[mode][space_i]->sub_idx_constrained_tables.end())
                   {
-    #pragma omp critical(precalc_shapeset_sub_idx_new)
+#pragma omp critical(precalc_shapeset_sub_idx_new)
                     if(this->precalculated_shapesets[mode][space_i]->sub_idx_constrained_tables.find(current_state.sub_idx[space_i]) == this->precalculated_shapesets[mode][space_i]->sub_idx_constrained_tables.end())
                       this->precalculated_shapesets[mode][space_i]->sub_idx_constrained_tables.insert(std::make_pair<int, std::map<int, PrecalcShapeset::Values*>>(current_state.sub_idx[space_i], newValuesConstrained));
                   }
@@ -1287,6 +1287,18 @@ namespace Hermes
             {
               for(current_state.isurf = 0; current_state.isurf < current_state.rep->nvert; current_state.isurf++)
               {
+                for(int space_i = 0; space_i < this->spaces.size(); space_i++)
+                {
+                  if(this->spaces[space_i]->get_mesh()->get_boundary_markers_conversion().get_user_marker(current_state.rep->en[current_state.isurf]->marker).valid)
+                  {
+                    if(this->spaces[space_i]->get_essential_bcs()->get_boundary_condition(this->spaces[space_i]->get_mesh()->get_boundary_markers_conversion().get_user_marker(current_state.rep->en[current_state.isurf]->marker).marker) != NULL)
+                    {
+                      current_state.bnd[current_state.isurf] = false;
+                      break;
+                    }
+                  }
+                }
+
                 if(current_state.bnd[current_state.isurf])
                 {
                   int order = this->integration_order;
@@ -1497,6 +1509,18 @@ namespace Hermes
         current_state->isBnd = false;
         for (current_state->isurf = 0; current_state->isurf < current_state->rep->nvert; current_state->isurf++)
         {
+          for(int space_i = 0; space_i < this->spaces.size(); space_i++)
+          {
+            if(this->spaces[space_i]->get_mesh()->get_boundary_markers_conversion().get_user_marker(current_state->rep->en[current_state->isurf]->marker).valid)
+            {
+              if(this->spaces[space_i]->get_essential_bcs()->get_boundary_condition(this->spaces[space_i]->get_mesh()->get_boundary_markers_conversion().get_user_marker(current_state->rep->en[current_state->isurf]->marker).marker) != NULL)
+              {
+                is_natural_bnd_condition[current_state->isurf] = false;
+                break;
+              }
+            }
+          }
+
           is_natural_bnd_condition[current_state->isurf] = false;
           if(!current_state->bnd[current_state->isurf])
             continue;
